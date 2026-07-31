@@ -10,9 +10,12 @@ import { MAX_SPEAKER_COUNT } from "../../constants/speakerDetection.json";
 import type { TranscriptSegment } from "../../stores/meetingRecordingStore";
 import {
   isTranscriptSpeakerLocked,
-  resolveSegmentSpeakerName,
   type TranscriptSpeakerStatus,
 } from "../../utils/transcriptSpeakerState";
+import {
+  getSpeakerDisplayNumber,
+  resolveSegmentSpeakerName,
+} from "../../utils/speakerNameResolution";
 
 const BUBBLE_STYLES = {
   mic: {
@@ -61,16 +64,13 @@ const getEffectiveSpeakerKey = (
   segment: TranscriptSegment,
   speakerMappings?: Record<string, string>
 ): string => {
-  const name = resolveSegmentSpeakerName(segment, speakerMappings);
+const { name } = resolveSegmentSpeakerName(segment, speakerMappings);
   if (name) return `name:${name.toLowerCase()}`;
   if (segment.speaker) return `id:${segment.speaker}`;
   return `src:${segment.source}`;
 };
 
-const getSpeakerNumber = (speakerId: string) => {
-  const match = speakerId.match(/speaker_(\d+)/);
-  return match ? Number(match[1]) + 1 : 1;
-};
+const getSpeakerNumber = getSpeakerDisplayNumber;
 
 const getSpeakerStateLabel = (state: TranscriptSpeakerStatus, t: (key: string) => string) => {
   switch (state) {
@@ -425,7 +425,7 @@ function SpeakerLabel({
       : segment.speakerStatus ||
         (segment.suggestedName && !resolvedName
           ? "suggested"
-          : segment.speakerName || resolvedName
+          : resolvedName
             ? "confirmed"
             : segment.speakerIsPlaceholder
               ? "provisional"
@@ -459,11 +459,10 @@ function SpeakerLabel({
 
   const displayLabel =
     resolvedName ||
-    segment.speakerName ||
     (isOriginallyYou
       ? t("notes.speaker.you")
       : t("notes.speaker.label", { n: getSpeakerNumber(speakerId) }));
-  const isUnmapped = !resolvedName && !segment.speakerName;
+  const isUnmapped = !resolvedName;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -816,7 +815,7 @@ export function MeetingTranscriptChat({
     () =>
       segments.map((segment) => ({
         key: getEffectiveSpeakerKey(segment, speakerMappings),
-        activeName: resolveSegmentSpeakerName(segment, speakerMappings),
+        activeName: resolveSegmentSpeakerName(segment, speakerMappings).name,
       })),
     [segments, speakerMappings]
   );
@@ -868,10 +867,9 @@ export function MeetingTranscriptChat({
   }
 
   const isSelfSide = (segment: TranscriptSegment): boolean => {
-    const mapped = segment.speaker ? speakerMappings?.[segment.speaker] : undefined;
-    if (mapped) return mapped.trim().toLowerCase() === t("notes.speaker.you").toLowerCase();
+    const { name } = resolveSegmentSpeakerName(segment, speakerMappings);
+    if (name) return name.trim().toLowerCase() === t("notes.speaker.you").toLowerCase();
     if (segment.speaker === "you") return true;
-    if (segment.speakerName) return false;
     return segment.source === "mic";
   };
 
@@ -973,8 +971,7 @@ export function MeetingTranscriptChat({
         onTouchEnd={handleTouchEnd}
         className="flex-1 min-h-0 overflow-y-auto pt-2 agent-chat-scroll pb-[var(--floating-inset,96px)]"
       >
-        <div className={cn("px-4", contentClassName)}>
-          <div style={{ height: totalSize, width: "100%", position: "relative" }}>
+<div style={{ height: totalSize, width: "100%", position: "relative" }}>
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const i = virtualItem.index;
               const segment = segments[i];
