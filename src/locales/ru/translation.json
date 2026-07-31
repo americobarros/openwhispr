@@ -683,6 +683,9 @@
         "recover": "Восстановить",
         "recovered": "Восстановлено"
       },
+      "meeting": {
+        "badge": "Встреча"
+      },
       "retryTranslationMode": "Режим перевода"
     },
     "aiCta": {

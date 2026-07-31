@@ -683,6 +683,9 @@
         "recover": "Recover",
         "recovered": "Recovered"
       },
+      "meeting": {
+        "badge": "Meeting"
+      },
       "retryTranslationMode": "Translation Mode"
     },
     "aiCta": {

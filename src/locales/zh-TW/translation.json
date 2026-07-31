@@ -683,6 +683,9 @@
         "recover": "復原",
         "recovered": "已復原"
       },
+      "meeting": {
+        "badge": "會議"
+      },
       "retryTranslationMode": "翻譯模式"
     },
     "aiCta": {

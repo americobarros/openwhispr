@@ -662,6 +662,9 @@
         "recover": "Recuperar",
         "recovered": "Recuperada"
       },
+      "meeting": {
+        "badge": "Reunião"
+      },
       "retryTranslationMode": "Modo de Tradução"
     },
     "aiCta": {

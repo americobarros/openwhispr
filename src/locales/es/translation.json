@@ -683,6 +683,9 @@
       "audioNotFound": "Archivo de audio no encontrado o expirado",
       "noAiProcessing": "No se aplicó procesamiento de IA a esta transcripción",
       "rawTranscript": "Transcripción sin procesar",
+      "meeting": {
+        "badge": "Reunión"
+      },
       "retryTranslationMode": "Modo Traducción"
     },
     "aiCta": {

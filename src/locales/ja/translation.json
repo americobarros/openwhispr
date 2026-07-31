@@ -683,6 +683,9 @@
         "recover": "復元",
         "recovered": "復元しました"
       },
+      "meeting": {
+        "badge": "ミーティング"
+      },
       "retryTranslationMode": "翻訳モード"
     },
     "aiCta": {

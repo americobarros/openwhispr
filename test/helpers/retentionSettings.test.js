@@ -12,6 +12,7 @@ test("reports a change when a retention period is shortened", () => {
     applyRetentionSettings(DEFAULT_RETENTION_SETTINGS, {
       audioRetentionDays: 1,
       transcriptRetentionDays: 1,
+      dataRetentionEnabled: true,
     }),
     {
       changed: true,
@@ -29,6 +30,7 @@ test("is idempotent when both values are unchanged — dual-window mount sync", 
   const { changed } = applyRetentionSettings(DEFAULT_RETENTION_SETTINGS, {
     audioRetentionDays: 30,
     transcriptRetentionDays: 0,
+    dataRetentionEnabled: true,
   });
   assert.equal(changed, false);
 });
@@ -210,4 +212,14 @@ test("carries whether the local-history policy has resolved, and reports it chan
     "the policy settling is the change that unblocks reconstruction"
   );
   assert.equal(arrival.settings.localHistoryPolicyResolved, true);
+});
+
+test("reports a change when data retention is toggled", () => {
+  const { changed, settings } = applyRetentionSettings(DEFAULT_RETENTION_SETTINGS, {
+    audioRetentionDays: 30,
+    transcriptRetentionDays: 0,
+    dataRetentionEnabled: false,
+  });
+  assert.equal(changed, true);
+  assert.equal(settings.dataRetentionEnabled, false);
 });
