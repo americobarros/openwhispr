@@ -51,6 +51,7 @@ import {
   teardownFailedMeetingRecordingSetup,
 } from "../helpers/meetingRecordingSession";
 import { persistFinalTranscriptAroundStop } from "../helpers/meetingTranscriptPersistence";
+import { assignSegmentsToSpeaker } from "../utils/speakerNameResolution";
 
 export interface TranscriptSegment {
   id: string;
@@ -1684,6 +1685,23 @@ export function lockSpeaker(speakerId: string, displayName: string): void {
   if (systemPartialSpeakerIdValue === speakerId) {
     setSystemPartialSpeakerIdentity(speakerId, displayName);
   }
+}
+
+/**
+ * Renames a single line without touching the rest of its cluster, by splitting it
+ * into its own speaker. Used once a cluster already has a name, where a further
+ * change is a correction to that one line.
+ */
+export function assignSegmentSpeaker(segmentId: string, displayName: string): string | null {
+  if (!segmentId || !displayName) return null;
+
+  const { segments } = useMeetingRecordingStore.getState();
+  const { segments: next, speakerId } = assignSegmentsToSpeaker(segments, [segmentId], displayName);
+  if (!speakerId) return null;
+
+  segmentsRefValue = next;
+  useMeetingRecordingStore.setState({ segments: next });
+  return speakerId;
 }
 
 export function cancelPreparedTranscription(): void {
