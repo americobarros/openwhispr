@@ -45,10 +45,16 @@ function createMeetingTranscriptionLifecycle({ start, stop, onError = () => {} }
 
     session.stopRequested = true;
     session.state = "stopping";
+    // Owner-loss / navigation stops arrive with no renderer options. Carry the
+    // noteId captured at start so retention can still link the recording.
+    const stopOptions = {
+      ...(session.noteId != null ? { noteId: session.noteId } : {}),
+      ...options,
+    };
     session.stopPromise = enqueue(async () => {
       try {
         if (!session.startSucceeded) return { success: true };
-        return await stop(session.sessionId, options);
+        return await stop(session.sessionId, stopOptions);
       } finally {
         removeSession(session);
       }
@@ -79,6 +85,9 @@ function createMeetingTranscriptionLifecycle({ start, stop, onError = () => {} }
     const session = {
       sessionId,
       ownerWebContents,
+      // Retention links the saved audio back to this note. Kept on the session
+      // so owner-loss teardown (no renderer IPC) still has it.
+      noteId: options?.noteId ?? null,
       state: "queued",
       startSucceeded: false,
       stopRequested: false,

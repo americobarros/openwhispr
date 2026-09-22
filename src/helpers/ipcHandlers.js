@@ -1809,11 +1809,12 @@ class IPCHandlers {
       }
       // Meeting / personal notes can hold more recordings than got linked —
       // an older note, or one whose save-time registration didn't land. Rescue
-      // every unclaimed retention recording whose exact text equals a note
-      // segment (a note with N recordings has their transcripts concatenated,
-      // so per-segment equality is what succeeds), persist the new links, and
-      // union them with the already-linked ones. Text equality only —
-      // timestamps are never a match key.
+      // every unclaimed retention recording whose exact text equals the note's
+      // plain text or any consecutive span of its utterance segments (a note
+      // with N recordings concatenates many fine-grained segments, so matching
+      // a whole recording against a single segment always fails), persist the
+      // new links, and union them with the already-linked ones. Text equality
+      // only — timestamps are never a match key.
       if (note && (note.note_type === "meeting" || note.note_type === "personal")) {
         const matched = this.databaseManager.findMeetingRetentionAudioSourcesForNote(note);
         for (const transcriptionId of matched) {

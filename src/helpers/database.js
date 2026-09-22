@@ -3105,17 +3105,50 @@ class DatabaseManager {
     return typeof note.transcript === "string" ? note.transcript : "";
   }
 
+  _normalizeTranscriptMatchText(value) {
+    return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  /**
+   * Whether `needle` equals the whole `haystack` joined text, or any consecutive
+   * span of its parts joined the same way (space-separated). Meeting notes store
+   * many utterance segments per recording, while retention saves one full
+   * recording transcript — so per-segment equality alone misses every real
+   * multi-utterance recording.
+   */
+  _transcriptTextMatchesParts(needle, parts) {
+    const target = this._normalizeTranscriptMatchText(needle);
+    if (!target || !Array.isArray(parts) || parts.length === 0) return false;
+    const normalizedParts = parts
+      .map((part) => this._normalizeTranscriptMatchText(part))
+      .filter(Boolean);
+    if (normalizedParts.length === 0) return false;
+    if (this._normalizeTranscriptMatchText(normalizedParts.join(" ")) === target) return true;
+    for (let start = 0; start < normalizedParts.length; start++) {
+      let acc = "";
+      for (let end = start; end < normalizedParts.length; end++) {
+        acc = acc ? `${acc} ${normalizedParts[end]}` : normalizedParts[end];
+        if (acc === target) return true;
+        // Parts are positive length; once longer than the target, later ends
+        // only grow, so this start cannot match.
+        if (acc.length > target.length) break;
+      }
+    }
+    return false;
+  }
+
   /**
    * Legacy association for recordings saved before the name-based link existed:
    * a note whose transcript text equals a retained meeting recording's text is
    * that recording's owner. A note can hold several recordings, whose transcripts
-   * are concatenated into the note's transcript, so a recording counts as owned
-   * when its text equals the note's whole plain text OR any single segment of it.
-   * Exact equality only — no time-of-day matching, since updated_at drifts and a
-   * bare time match can attach an unrelated meeting. Transcriptions already
-   * claimed by another note are never reused. Going forward the link is written
-   * at save time (registerNoteAudioSource), so this is a recovery net that fires
-   * once per recording and fast-paths afterward.
+   * are concatenated into the note's transcript as many fine-grained utterance
+   * segments, so a recording counts as owned when its text equals the note's
+   * whole plain text OR any consecutive span of segments. Exact equality only —
+   * no time-of-day matching, since updated_at drifts and a bare time match can
+   * attach an unrelated meeting. Transcriptions already claimed by another note
+   * are never reused. Going forward the link is written at save time
+   * (registerNoteAudioSource), so this is a recovery net that fires once per
+   * recording and fast-paths afterward.
    */
   findMeetingRetentionAudioSourcesForNote(note) {
     try {
@@ -3123,19 +3156,10 @@ class DatabaseManager {
       const noteText = this._noteTranscriptPlainText(note);
       if (!noteText) return [];
 
-      const wanted = new Set();
-      const add = (value) => {
-        const normalized = (value || "").replace(/\s+/g, " ").trim().toLowerCase();
-        if (normalized) wanted.add(normalized);
-      };
-      add(noteText);
       const segments = this._parseNoteTranscript(note);
-      if (Array.isArray(segments)) {
-        for (const segment of segments) {
-          if (typeof segment?.text === "string") add(segment.text);
-        }
-      }
-      if (wanted.size === 0) return [];
+      const segmentTexts = Array.isArray(segments)
+        ? segments.map((segment) => (typeof segment?.text === "string" ? segment.text : ""))
+        : [noteText];
 
       const rows = this.db
         .prepare(
@@ -3146,10 +3170,7 @@ class DatabaseManager {
               AND id NOT IN (SELECT transcription_id FROM note_audio_sources)`
         )
         .all();
-      const exact = rows.filter((row) => {
-        const normalized = (row.text || "").replace(/\s+/g, " ").trim().toLowerCase();
-        return normalized ? wanted.has(normalized) : false;
-      });
+      const exact = rows.filter((row) => this._transcriptTextMatchesParts(row.text, segmentTexts));
       if (exact.length === 0) return [];
 
       // Chronological order: a note's segments appear in recording order, so this

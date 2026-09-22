@@ -128,11 +128,14 @@ test("matches OWNED recordings and ignores unclaimed ones", (t) => {
   if (!db) return;
   insertMeetingRecording(db, "unrelated meeting", 30);
   const recording = insertMeetingRecording(db, "hello this is a dictation", 3);
-  const noteId = insertNote(db, {
-    title: "single recording note",
-    transcript: JSON.stringify([{ text: "Hello this is a dictation." }]),
-  });
-  const note = db.getNote(noteId);
+  const transcript = JSON.stringify([{ text: "hello this is a dictation" }]);
+  const note = {
+    id: insertNote(db, {
+      title: "single recording note",
+      transcript,
+    }),
+    transcript,
+  };
 
   assert.deepEqual(db.findMeetingRetentionAudioSourcesForNote(note), [recording]);
   assert.equal(db.findMeetingRetentionAudioForNote(note), recording);
@@ -158,6 +161,63 @@ test("matches every recording whose text equals a note segment, oldest first", (
   };
 
   assert.deepEqual(db.findMeetingRetentionAudioSourcesForNote(note), [first, second]);
+});
+
+test("matches a recording whose text spans multiple utterance segments", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  // Real meeting notes store many fine-grained utterances per recording.
+  // Retention saves the full joined transcript; rescue must match consecutive
+  // segment spans, not only single-segment equality.
+  const first = insertMeetingRecording(
+    db,
+    "But I ended up making quinoa. zucchini, squash, red beans.",
+    4
+  );
+  const second = insertMeetingRecording(
+    db,
+    "So it was really good though. I forgot the spinach.",
+    1
+  );
+  const note = {
+    id: insertNote(db, {
+      title: "8ppltalking",
+      transcript: JSON.stringify([
+        { text: "But I ended up making quinoa." },
+        { text: "zucchini, squash, red beans." },
+        { text: "So it was really good though." },
+        { text: "I forgot the spinach." },
+      ]),
+    }),
+    transcript: JSON.stringify([
+      { text: "But I ended up making quinoa." },
+      { text: "zucchini, squash, red beans." },
+      { text: "So it was really good though." },
+      { text: "I forgot the spinach." },
+    ]),
+  };
+
+  assert.deepEqual(db.findMeetingRetentionAudioSourcesForNote(note), [first, second]);
+});
+
+test("rescues remaining recordings when one is already linked", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const first = insertMeetingRecording(db, "first half of the call", 4);
+  const second = insertMeetingRecording(db, "second half of the call", 1);
+  const transcript = JSON.stringify([
+    { text: "first half of the call" },
+    { text: "second half of the call" },
+  ]);
+  const noteId = insertNote(db, {
+    title: "partially linked",
+    transcript,
+  });
+  db.registerNoteAudioSource(noteId, first, "first.webm");
+
+  assert.deepEqual(db.findMeetingRetentionAudioSourcesForNote({ id: noteId, transcript }), [
+    second,
+  ]);
 });
 
 test("never reuses a recording already claimed by another note", (t) => {

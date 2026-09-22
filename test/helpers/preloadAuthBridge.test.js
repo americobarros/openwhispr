@@ -73,7 +73,17 @@ test("meeting stop forwards the optional expected recording session ID", async (
 
   await api.meetingTranscriptionStop("meeting-2");
 
-  assert.deepEqual(invocations, [["meeting-transcription-stop", "meeting-2"]]);
+  assert.deepEqual(invocations, [["meeting-transcription-stop", "meeting-2", undefined]]);
+});
+
+test("meeting stop forwards the noteId fallback used for retention linking", async () => {
+  const { api, invocations } = loadPreloadApi();
+
+  await api.meetingTranscriptionStop("meeting-2", { noteId: 22 });
+
+  assert.deepEqual(invocations, [
+    ["meeting-transcription-stop", "meeting-2", { noteId: 22 }],
+  ]);
 });
 
 test("meeting system-audio availability forwards the scoped session", async () => {

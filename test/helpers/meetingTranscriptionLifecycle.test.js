@@ -132,6 +132,30 @@ for (const ownerLossEvent of ["destroyed", "render-process-gone"]) {
   });
 }
 
+test("owner-loss stop still forwards the noteId captured at start", async () => {
+  const stopCompleted = createDeferred();
+  const ownerWebContents = createOwnerWebContents();
+  let stopOptions = null;
+  const lifecycle = createMeetingTranscriptionLifecycle({
+    start: async ({ sessionId }) => ({ success: true, sessionId }),
+    stop: async (_sessionId, options) => {
+      stopOptions = options;
+      stopCompleted.resolve();
+      return { success: true };
+    },
+  });
+
+  await lifecycle.startSession({
+    sessionId: "meeting-1",
+    ownerWebContents,
+    options: { noteId: 22 },
+  });
+  ownerWebContents.emit("destroyed");
+  await stopCompleted.promise;
+
+  assert.deepEqual(stopOptions, { noteId: 22 });
+});
+
 test("a main-frame navigation of the owner tears down the session; same-document does not", async () => {
   const stopCompleted = createDeferred();
   const ownerWebContents = createOwnerWebContents();
