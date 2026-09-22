@@ -2747,6 +2747,8 @@
     "speakerNone": "無",
     "recording": "錄音",
     "multipleRecordings": "此筆記包含 {{count}} 段錄音。所有錄音都會被轉錄並合併為一份轉錄稿。",
+    "recordingOf": "錄音 {{current}} / {{total}}",
+    "writtenBytes": "已寫入 {{size}} 轉錄內容",
     "disfluencies": "包含口誤詞",
     "disfluenciesHint": "保留「嗯」「呃」等填充詞。",
     "overlapping": "重疊語音",

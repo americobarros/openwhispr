@@ -2675,6 +2675,8 @@
     "speakerNone": "なし",
     "recording": "録音",
     "multipleRecordings": "このノートには {{count}} 件の録音があります。すべてが文字起こしされ、1つの文字起こしにまとめられます。",
+    "recordingOf": "録音 {{current}} / {{total}}",
+    "writtenBytes": "文字起こしに {{size}} 書き込み済み",
     "disfluencies": "言いよどみを含める",
     "disfluenciesHint": "「あー」「うーん」などのフィラーを残します。",
     "overlapping": "重なり発話",

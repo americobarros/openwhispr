@@ -2747,6 +2747,8 @@
     "speakerNone": "Nenhum",
     "recording": "Gravação",
     "multipleRecordings": "Esta nota possui {{count}} gravações. Todas serão transcritas e combinadas em uma única transcrição.",
+    "recordingOf": "Gravação {{current}} de {{total}}",
+    "writtenBytes": "{{size}} gravadas na transcrição",
     "disfluencies": "Incluir disfluências",
     "disfluenciesHint": "Manter palavras de preenchimento como «uh» e «hum».",
     "overlapping": "Fala sobreposta",

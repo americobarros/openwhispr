@@ -3090,6 +3090,8 @@
     "speakerNone": "Keine",
     "recording": "Aufnahme",
     "multipleRecordings": "Diese Notiz enthält {{count}} Aufnahmen. Alle werden transkribiert und zu einem Transkript zusammengeführt.",
+    "recordingOf": "Aufnahme {{current}} von {{total}}",
+    "writtenBytes": "{{size}} ins Transkript geschrieben",
     "disfluencies": "Unflüssigkeiten aufnehmen",
     "disfluenciesHint": "Füllwörter wie „äh“ und „mhm“ behalten.",
     "overlapping": "Überlappende Sprache",

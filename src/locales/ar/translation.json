@@ -1419,6 +1419,8 @@
     "speakerNone": "لا شيء",
     "recording": "تسجيل",
     "multipleRecordings": "تحتوي هذه الملاحظة على {{count}} تسجيلات. سيتم نسخها جميعاً ودمجها في نص واحد.",
+    "recordingOf": "تسجيل {{current}} من {{total}}",
+    "writtenBytes": "تمت كتابة {{size}} في النص",
     "disfluencies": "تضمين الترددات",
     "disfluenciesHint": "الاحتفاظ بكلمات الحشو مثل «أه» و«هم».",
     "overlapping": "كلام متداخل",

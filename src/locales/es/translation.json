@@ -2800,6 +2800,8 @@
     "speakerNone": "Ninguno",
     "recording": "Grabación",
     "multipleRecordings": "Esta nota tiene {{count}} grabaciones. Todas se transcribirán y se combinarán en una sola transcripción.",
+    "recordingOf": "Grabación {{current}} de {{total}}",
+    "writtenBytes": "{{size}} escritos en la transcripción",
     "disfluencies": "Incluir disfluencias",
     "disfluenciesHint": "Mantener muletillas como «eh» y «um».",
     "overlapping": "Habla superpuesta",

@@ -2763,6 +2763,8 @@
     "speakerNone": "Нет",
     "recording": "Запись",
     "multipleRecordings": "В этой заметке {{count}} записей. Все они будут расшифрованы и объединены в одну расшифровку.",
+    "recordingOf": "Запись {{current}} из {{total}}",
+    "writtenBytes": "{{size}} записано в расшифровку",
     "disfluencies": "Включать запинки",
     "disfluenciesHint": "Сохранять слова-паразиты вроде «э-э» и «хм».",
     "overlapping": "Пересекающаяся речь",

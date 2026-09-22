@@ -3090,6 +3090,8 @@
     "speakerNone": "Aucun",
     "recording": "Enregistrement",
     "multipleRecordings": "Cette note contient {{count}} enregistrements. Tous seront transcrits et fusionnés en une seule transcription.",
+    "recordingOf": "Enregistrement {{current}} sur {{total}}",
+    "writtenBytes": "{{size}} écrites vers la transcription",
     "disfluencies": "Inclure les disfluences",
     "disfluenciesHint": "Conserver les tics de langage comme « euh » et « hum ».",
     "overlapping": "Parole superposée",

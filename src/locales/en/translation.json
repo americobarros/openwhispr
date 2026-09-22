@@ -3100,6 +3100,8 @@
     "processingAudio": "Converting and processing the audio.",
     "writingTranscript": "Writing the transcript.",
     "runningHint": "This runs completely locally and may take several minutes for long meetings. You can keep using OpenWhispr in the meantime.",
+    "recordingOf": "Recording {{current}} of {{total}}",
+    "writtenBytes": "{{size}} written to the transcript",
     "savedToHistory": "The transcript was saved to History with a meeting badge.",
     "savedToNote": "The transcript was saved to this note.",
     "errorGeneric": "noScribe transcription failed.",

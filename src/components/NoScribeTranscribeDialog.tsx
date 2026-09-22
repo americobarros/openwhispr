@@ -18,6 +18,12 @@ import {
 import { cn } from "./lib/utils";
 import type { NoteItem, TranscriptionItem as TranscriptionItemType } from "../types/electron";
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 const NO_SCRIBE_LANGUAGES: ReadonlyArray<{ code: string; label: string }> = [
   { code: "auto", label: "Auto" },
   { code: "multilingual", label: "Multilingual" },
@@ -115,7 +121,12 @@ export default function NoScribeTranscribeDialog({
   const [transcript, setTranscript] = useState("");
   const [transcriptionId, setTranscriptionId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
-  const [progress, setProgress] = useState<{ stage: string; bytes?: number } | null>(null);
+  const [progress, setProgress] = useState<{
+    stage: string;
+    bytes?: number;
+    recordingIndex?: number;
+    recordingCount?: number;
+  } | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const progressUnsubRef = useRef<(() => void) | null>(null);
 
@@ -402,11 +413,7 @@ export default function NoScribeTranscribeDialog({
         {stage === "running" && (
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-3">
-              {progress?.stage === "writing" ? (
-                <Loader2 size={16} className="animate-spin text-primary" />
-              ) : (
-                <AudioLines size={16} className="text-primary" />
-              )}
+              <Loader2 size={16} className="animate-spin text-primary" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground">{t("noscribe.running")}</p>
                 <p className="text-xs text-muted-foreground">
@@ -414,6 +421,21 @@ export default function NoScribeTranscribeDialog({
                     ? t("noscribe.writingTranscript")
                     : t("noscribe.processingAudio")}
                 </p>
+                {progress?.recordingCount != null &&
+                  progress.recordingCount > 1 &&
+                  progress.recordingIndex != null && (
+                    <p className="text-xs text-muted-foreground">
+                      {t("noscribe.recordingOf", {
+                        current: progress.recordingIndex,
+                        total: progress.recordingCount,
+                      })}
+                    </p>
+                  )}
+                {progress?.stage === "writing" && (progress.bytes ?? 0) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("noscribe.writtenBytes", { size: formatFileSize(progress.bytes ?? 0) })}
+                  </p>
+                )}
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{t("noscribe.runningHint")}</p>
