@@ -269,6 +269,10 @@ export default function NoteEditor({
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [noScribeDialogOpen, setNoScribeDialogOpen] = useState(false);
   const [noScribeTranscript, setNoScribeTranscript] = useState<string | null>(null);
+  const noScribeSaveRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null;
+    latest: string | null;
+  }>({ timer: null, latest: null });
   const [noteHasNoScribeAudio, setNoteHasNoScribeAudio] = useState(false);
   const [noteNoScribeAudioSources, setNoteNoScribeAudioSources] = useState<
     { transcriptionId: number; fileName: string | null; available: boolean }[]
@@ -567,6 +571,32 @@ export default function NoteEditor({
       }),
     [note.id]
   );
+
+  const handleNoScribeTranscriptChange = useCallback(
+    (markdown: string) => {
+      setNoScribeTranscript(markdown);
+      const draft = noScribeSaveRef.current;
+      draft.latest = markdown;
+      if (draft.timer) clearTimeout(draft.timer);
+      draft.timer = setTimeout(() => {
+        draft.timer = null;
+        void window.electronAPI?.setNoteNoScribeTranscript?.(note.id, markdown);
+      }, 600);
+    },
+    [note.id]
+  );
+
+  useEffect(() => {
+    const draft = noScribeSaveRef.current;
+    return () => {
+      if (draft.timer && draft.latest != null) {
+        clearTimeout(draft.timer);
+        void window.electronAPI?.setNoteNoScribeTranscript?.(note.id, draft.latest);
+      }
+      draft.timer = null;
+      draft.latest = null;
+    };
+  }, [note.id]);
 
   // A meeting's retention audio is written asynchronously after stop. When it
   // lands, refresh the audio-availability gate so the note picks up its
@@ -1368,7 +1398,11 @@ export default function NoteEditor({
                 )}
               </EmptyStateCard>
             ) : viewMode === "noscribe" && noScribeTranscript ? (
-              <RichTextEditor value={noScribeTranscript} disabled />
+              <RichTextEditor
+                value={noScribeTranscript}
+                onChange={handleNoScribeTranscriptChange}
+                disabled={!canEditNote}
+              />
             ) : viewMode === "enhanced" && enhancement ? (
               <RichTextEditor
                 value={enhancement.content}

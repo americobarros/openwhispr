@@ -3010,7 +3010,7 @@ class DatabaseManager {
            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
            ON CONFLICT(note_id) DO UPDATE SET
              transcript = excluded.transcript,
-             model = excluded.model,
+             model = COALESCE(excluded.model, model),
              created_at = CURRENT_TIMESTAMP`
         )
         .run(noteId, transcript, model);

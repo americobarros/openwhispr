@@ -189,6 +189,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("noscribe-progress", listener);
   },
   getNoteNoScribeTranscript: (noteId) => ipcRenderer.invoke("get-note-noscribe-transcript", noteId),
+  setNoteNoScribeTranscript: (noteId, transcript, model) =>
+    ipcRenderer.invoke("set-note-noscribe-transcript", noteId, transcript, model),
   hasNoteNoScribeAudio: (noteId) => ipcRenderer.invoke("has-note-noscribe-audio", noteId),
   getNoteNoScribeAudioSources: (noteId) => ipcRenderer.invoke("get-note-noscribe-audio-sources", noteId),
   onNoteNoScribeAudioSourceUpdated: (callback) => {

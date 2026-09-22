@@ -1369,6 +1369,11 @@ declare global {
         callback: (info: { requestId: string; stage: string; bytes?: number }) => void
       ) => () => void;
       getNoteNoScribeTranscript: (noteId: number) => Promise<string | null>;
+      setNoteNoScribeTranscript: (
+        noteId: number,
+        transcript: string,
+        model?: string | null
+      ) => Promise<{ success: boolean; error?: string }>;
       hasNoteNoScribeAudio: (noteId: number) => Promise<boolean>;
       getNoteNoScribeAudioSources: (
         noteId: number

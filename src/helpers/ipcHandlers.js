@@ -2015,6 +2015,15 @@ class IPCHandlers {
       return this.databaseManager.getNoteNoScribeTranscript(noteId);
     });
 
+    ipcMain.handle("set-note-noscribe-transcript", (_event, noteId, transcript, model) => {
+      if (typeof noteId !== "number" || typeof transcript !== "string") {
+        return { success: false, error: "invalid-args" };
+      }
+      this.databaseManager.setNoteNoScribeTranscript(noteId, transcript, model ?? null);
+      broadcastToWindows("note-noscribe-transcript", { noteId, transcript });
+      return { success: true };
+    });
+
     ipcMain.handle("has-note-noscribe-audio", (_event, noteId) => {
       return Boolean(resolveNoScribeAudio({ transcriptionId: null, noteId }));
     });
