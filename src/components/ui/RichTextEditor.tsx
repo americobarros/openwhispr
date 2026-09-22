@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import type { AnyExtension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -18,6 +19,8 @@ interface RichTextEditorProps {
   editorRef?: MutableRefObject<Editor | null>;
   /** Enables @mention tagging with these people as suggestions. */
   mentionPeople?: MentionPerson[];
+  /** Extra tiptap extensions appended after the mention extension. */
+  extraExtensions?: AnyExtension[];
 }
 
 export function RichTextEditor({
@@ -28,6 +31,7 @@ export function RichTextEditor({
   disabled,
   editorRef,
   mentionPeople,
+  extraExtensions,
 }: RichTextEditorProps) {
   const internalValueRef = useRef(value);
   const suppressUpdateRef = useRef(false);
@@ -43,6 +47,7 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       ...(withMentions ? [createMentionExtension(() => mentionPeopleRef.current ?? [])] : []),
+      ...(extraExtensions ?? []),
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         bulletList: { keepMarks: true },

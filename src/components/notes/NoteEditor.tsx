@@ -41,6 +41,8 @@ import { NoteSharingService } from "../../services/NoteSharingService";
 import { fetchSpaceRoster } from "../../hooks/useSpaceRoster";
 import { useAuth } from "../../hooks/useAuth";
 import { RichTextEditor } from "../ui/RichTextEditor";
+import { FindReplaceBar } from "../ui/FindReplaceBar";
+import { findReplaceHighlight } from "../ui/richTextFindReplace";
 import type { Editor } from "@tiptap/react";
 import { MeetingTranscriptChat, SelectionBar } from "./MeetingTranscriptChat";
 import {
@@ -273,6 +275,7 @@ export default function NoteEditor({
     timer: ReturnType<typeof setTimeout> | null;
     latest: string | null;
   }>({ timer: null, latest: null });
+  const noScribeEditorRef = useRef<Editor | null>(null);
   const [noteHasNoScribeAudio, setNoteHasNoScribeAudio] = useState(false);
   const [noteNoScribeAudioSources, setNoteNoScribeAudioSources] = useState<
     { transcriptionId: number; fileName: string | null; available: boolean }[]
@@ -1398,11 +1401,20 @@ export default function NoteEditor({
                 )}
               </EmptyStateCard>
             ) : viewMode === "noscribe" && noScribeTranscript ? (
-              <RichTextEditor
-                value={noScribeTranscript}
-                onChange={handleNoScribeTranscriptChange}
-                disabled={!canEditNote}
-              />
+              <div className="flex h-full min-h-0 flex-col">
+                <div className={cn(PAGE_CONTENT_WIDTH_CLASS, "shrink-0 pt-1")}>
+                  <FindReplaceBar editorRef={noScribeEditorRef} canEdit={canEditNote} />
+                </div>
+                <div className="relative flex-1 min-h-0">
+                  <RichTextEditor
+                    value={noScribeTranscript}
+                    onChange={handleNoScribeTranscriptChange}
+                    disabled={!canEditNote}
+                    editorRef={noScribeEditorRef}
+                    extraExtensions={[findReplaceHighlight]}
+                  />
+                </div>
+              </div>
             ) : viewMode === "enhanced" && enhancement ? (
               <RichTextEditor
                 value={enhancement.content}

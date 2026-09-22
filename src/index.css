@@ -1868,3 +1868,15 @@ a:hover {
   border-radius: 8px;
   background-color: var(--color-border);
 }
+
+/* Find/replace match highlights in the tiptap editors */
+.find-replace-match {
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  border-radius: 2px;
+}
+
+.find-replace-match--active {
+  background: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  outline: 1.5px solid var(--color-primary);
+  outline-offset: 1px;
+}
