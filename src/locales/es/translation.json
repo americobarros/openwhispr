@@ -2799,7 +2799,7 @@
     "speakerAuto": "Automático",
     "speakerNone": "Ninguno",
     "recording": "Grabación",
-    "recordingPlaceholder": "Selecciona una grabación",
+    "multipleRecordings": "Esta nota tiene {{count}} grabaciones. Todas se transcribirán y se combinarán en una sola transcripción.",
     "disfluencies": "Incluir disfluencias",
     "disfluenciesHint": "Mantener muletillas como «eh» y «um».",
     "overlapping": "Habla superpuesta",

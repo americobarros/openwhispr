@@ -3089,7 +3089,7 @@
     "speakerAuto": "Automatique",
     "speakerNone": "Aucun",
     "recording": "Enregistrement",
-    "recordingPlaceholder": "Sélectionner un enregistrement",
+    "multipleRecordings": "Cette note contient {{count}} enregistrements. Tous seront transcrits et fusionnés en une seule transcription.",
     "disfluencies": "Inclure les disfluences",
     "disfluenciesHint": "Conserver les tics de langage comme « euh » et « hum ».",
     "overlapping": "Parole superposée",

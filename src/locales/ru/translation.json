@@ -2762,7 +2762,7 @@
     "speakerAuto": "Авто",
     "speakerNone": "Нет",
     "recording": "Запись",
-    "recordingPlaceholder": "Выберите запись",
+    "multipleRecordings": "В этой заметке {{count}} записей. Все они будут расшифрованы и объединены в одну расшифровку.",
     "disfluencies": "Включать запинки",
     "disfluenciesHint": "Сохранять слова-паразиты вроде «э-э» и «хм».",
     "overlapping": "Пересекающаяся речь",

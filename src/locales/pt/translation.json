@@ -2746,7 +2746,7 @@
     "speakerAuto": "Automático",
     "speakerNone": "Nenhum",
     "recording": "Gravação",
-    "recordingPlaceholder": "Selecionar uma gravação",
+    "multipleRecordings": "Esta nota possui {{count}} gravações. Todas serão transcritas e combinadas em uma única transcrição.",
     "disfluencies": "Incluir disfluências",
     "disfluenciesHint": "Manter palavras de preenchimento como «uh» e «hum».",
     "overlapping": "Fala sobreposta",

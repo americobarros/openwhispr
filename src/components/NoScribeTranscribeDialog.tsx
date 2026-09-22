@@ -116,7 +116,6 @@ export default function NoScribeTranscribeDialog({
   const [transcriptionId, setTranscriptionId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [progress, setProgress] = useState<{ stage: string; bytes?: number } | null>(null);
-  const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const progressUnsubRef = useRef<(() => void) | null>(null);
 
@@ -127,7 +126,6 @@ export default function NoScribeTranscribeDialog({
     setTranscriptionId(null);
     setCopied(false);
     setProgress(null);
-    setSelectedSourceId(null);
   }, []);
 
   useEffect(() => {
@@ -179,8 +177,6 @@ export default function NoScribeTranscribeDialog({
     });
     progressUnsubRef.current = unsubscribe;
     try {
-      const sourceTranscriptionId =
-        note && audioSources.length > 1 ? (selectedSourceId ?? audioSources[0]?.transcriptionId) : undefined;
       const result = await window.electronAPI.transcribeWithNoScribe(sourceId, {
         requestId,
         language,
@@ -190,7 +186,6 @@ export default function NoScribeTranscribeDialog({
         disfluencies,
         overlapping,
         noteId: note ? note.id : undefined,
-        sourceTranscriptionId,
       });
       unsubscribe();
       progressUnsubRef.current = null;
@@ -213,7 +208,7 @@ export default function NoScribeTranscribeDialog({
       setError(err instanceof Error ? err.message : String(err));
       setStage("error");
     }
-  }, [note, item, language, model, speakerDetection, timestamps, disfluencies, overlapping, t, onTranscribed, audioSources, selectedSourceId]);
+  }, [note, item, language, model, speakerDetection, timestamps, disfluencies, overlapping, t, onTranscribed]);
 
   const handleCancel = useCallback(() => {
     cancelRunning();
@@ -224,13 +219,10 @@ export default function NoScribeTranscribeDialog({
     const sourceId = note ? note.id : item?.id ?? null;
     if (sourceId == null) return;
     try {
-      const sourceTranscriptionId =
-        note && audioSources.length > 1 ? (selectedSourceId ?? audioSources[0]?.transcriptionId) : undefined;
       const result = await window.electronAPI.openNoScribeFile(sourceId, {
         model,
         speakerDetection,
         noteId: note ? note.id : undefined,
-        sourceTranscriptionId,
       });
       if (result.success) {
         onOpenChange(false);
@@ -244,7 +236,7 @@ export default function NoScribeTranscribeDialog({
       setError(err instanceof Error ? err.message : String(err));
       setStage("error");
     }
-  }, [note, item, model, speakerDetection, onOpenChange, t, audioSources, selectedSourceId]);
+  }, [note, item, model, speakerDetection, onOpenChange, t]);
 
   const handleCopy = useCallback(async () => {
     await onCopy(transcript);
@@ -348,26 +340,13 @@ export default function NoScribeTranscribeDialog({
             </div>
 
             {note && audioSources.length > 1 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="noscribe-source">{t("noscribe.recording")}</Label>
-                <Select
-                  value={selectedSourceId != null ? String(selectedSourceId) : ""}
-                  onValueChange={(value) => setSelectedSourceId(Number(value))}
-                >
-                  <SelectTrigger id="noscribe-source" className="w-full">
-                    <SelectValue placeholder={t("noscribe.recordingPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {audioSources.map((source) => (
-                      <SelectItem key={source.transcriptionId} value={String(source.transcriptionId)}>
-                        <span className="flex items-center gap-2">
-                          <AudioLines size={13} className="text-muted-foreground" />
-                          {source.fileName || String(source.transcriptionId)}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-start gap-2 rounded-xl border border-border/70 bg-surface-1 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground dark:bg-surface-3">
+                <AudioLines size={13} className="mt-0.5 shrink-0 text-primary" />
+                <span>
+                  {t("noscribe.multipleRecordings", {
+                    count: audioSources.length,
+                  })}
+                </span>
               </div>
             )}
 

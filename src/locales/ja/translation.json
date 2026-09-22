@@ -2674,7 +2674,7 @@
     "speakerAuto": "自動",
     "speakerNone": "なし",
     "recording": "録音",
-    "recordingPlaceholder": "録音を選択",
+    "multipleRecordings": "このノートには {{count}} 件の録音があります。すべてが文字起こしされ、1つの文字起こしにまとめられます。",
     "disfluencies": "言いよどみを含める",
     "disfluenciesHint": "「あー」「うーん」などのフィラーを残します。",
     "overlapping": "重なり発話",

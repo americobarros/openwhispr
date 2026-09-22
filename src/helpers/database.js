@@ -3083,14 +3083,19 @@ class DatabaseManager {
     }
   }
 
+  _parseNoteTranscript(note) {
+    if (!note?.transcript) return null;
+    try {
+      const parsed = JSON.parse(note.transcript);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
   _noteTranscriptPlainText(note) {
     if (!note?.transcript) return "";
-    let parsed;
-    try {
-      parsed = JSON.parse(note.transcript);
-    } catch {
-      return typeof note.transcript === "string" ? note.transcript : "";
-    }
+    const parsed = this._parseNoteTranscript(note);
     if (Array.isArray(parsed)) {
       return parsed
         .map((segment) => (typeof segment?.text === "string" ? segment.text : ""))
@@ -3103,17 +3108,34 @@ class DatabaseManager {
   /**
    * Legacy association for recordings saved before the name-based link existed:
    * a note whose transcript text equals a retained meeting recording's text is
-   * that recording's owner. Exact equality only — no time-of-day matching, since
-   * updated_at drifts and a bare time match can attach an unrelated meeting.
-   * Transcriptions already claimed by another note are never reused. Going
-   * forward the link is written at save time (registerNoteAudioSource), so this
-   * only ever fires once per note and fast-paths afterward.
+   * that recording's owner. A note can hold several recordings, whose transcripts
+   * are concatenated into the note's transcript, so a recording counts as owned
+   * when its text equals the note's whole plain text OR any single segment of it.
+   * Exact equality only — no time-of-day matching, since updated_at drifts and a
+   * bare time match can attach an unrelated meeting. Transcriptions already
+   * claimed by another note are never reused. Going forward the link is written
+   * at save time (registerNoteAudioSource), so this is a recovery net that fires
+   * once per recording and fast-paths afterward.
    */
-  findMeetingRetentionAudioForNote(note) {
+  findMeetingRetentionAudioSourcesForNote(note) {
     try {
       if (!this.db) throw new Error("Database not initialized");
       const noteText = this._noteTranscriptPlainText(note);
-      if (!noteText) return null;
+      if (!noteText) return [];
+
+      const wanted = new Set();
+      const add = (value) => {
+        const normalized = (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+        if (normalized) wanted.add(normalized);
+      };
+      add(noteText);
+      const segments = this._parseNoteTranscript(note);
+      if (Array.isArray(segments)) {
+        for (const segment of segments) {
+          if (typeof segment?.text === "string") add(segment.text);
+        }
+      }
+      if (wanted.size === 0) return [];
 
       const rows = this.db
         .prepare(
@@ -3124,25 +3146,31 @@ class DatabaseManager {
               AND id NOT IN (SELECT transcription_id FROM note_audio_sources)`
         )
         .all();
-      const normalize = (value) =>
-        (value || "").replace(/\s+/g, " ").trim().toLowerCase();
-      const wanted = normalize(noteText);
-      const exact = rows.filter((row) => normalize(row.text) === wanted);
-      if (exact.length === 0) return null;
+      const exact = rows.filter((row) => {
+        const normalized = (row.text || "").replace(/\s+/g, " ").trim().toLowerCase();
+        return normalized ? wanted.has(normalized) : false;
+      });
+      if (exact.length === 0) return [];
 
-      // On a tie, the most recent recording wins.
+      // Chronological order: a note's segments appear in recording order, so this
+      // keeps the transcription order aligned with the note's own transcript.
       exact.sort((a, b) =>
-        String(b.created_at || "").localeCompare(String(a.created_at || ""))
+        String(a.created_at || "").localeCompare(String(b.created_at || ""))
       );
-      return exact[0].id;
+      return exact.map((row) => row.id);
     } catch (error) {
       debugLogger.error(
         "Error matching meeting retention audio",
         { error: error.message, noteId: note?.id },
         "meeting"
       );
-      return null;
+      return [];
     }
+  }
+
+  findMeetingRetentionAudioForNote(note) {
+    const ids = this.findMeetingRetentionAudioSourcesForNote(note);
+    return ids.length > 0 ? ids[0] : null;
   }
 
   getNoteByCloudId(cloudId) {

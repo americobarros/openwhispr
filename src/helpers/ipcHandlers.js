@@ -1766,53 +1766,80 @@ class IPCHandlers {
     // dictations) with the user's installed noScribe app. The recording audio
     // is resolved from a transcription id, or — when a noteId is passed — from
     // the note itself (upload notes carry their own file, meeting notes point
-    // at their retention-saved recording), so no foreign file paths ever reach
+    // at their retention-saved recordings), so no foreign file paths ever reach
     // the renderer.
-    const resolveNoScribeAudio = ({ transcriptionId, noteId, sourceTranscriptionId }) => {
-      if (noteId != null) {
-        // A note's recordings are linked by name in note_audio_sources — never
-        // a bare id match (note ids share the autoincrement space with
-        // transcription ids, so probing the audio store with the note id can
-        // hand back an unrelated recording). Callers may pick one recording
-        // explicitly when a note holds several.
-        const sources = this.databaseManager.getNoteAudioSources(noteId);
-        const wanted =
-          sourceTranscriptionId != null
-            ? sources.find((s) => s.transcription_id === sourceTranscriptionId)
-            : sources[0];
-        if (wanted != null) {
-          const path = this.audioStorageManager.getAudioPath(wanted.transcription_id);
-          if (path) return path;
+    //
+    // A note can hold several recordings, each kept as its own entry in
+    // note_audio_sources (never a bare id match — note ids share the
+    // autoincrement space with transcription ids, so probing the audio store
+    // with a note id can hand back an unrelated recording). All of them are
+    // returned so the note's every recording can be re-transcribed.
+    const resolveNoScribeNoteAudioTargets = (noteId) => {
+      if (noteId == null) return [];
+      const targets = [];
+      for (const source of this.databaseManager.getNoteAudioSources(noteId)) {
+        const filePath = this.audioStorageManager.getAudioPath(source.transcription_id);
+        if (filePath) {
+          targets.push({
+            path: filePath,
+            transcriptionId: source.transcription_id,
+            fileName:
+              source.file_name ||
+              this.audioStorageManager.getAudioFileName(source.transcription_id) ||
+              null,
+          });
         }
-        // Upload and URL-ingest notes carry their own file path.
-        const note = this.databaseManager.getNote(noteId);
-        if (
-          note &&
-          note.note_type === "upload" &&
-          note.source_file &&
-          fs.existsSync(note.source_file)
-        ) {
-          return note.source_file;
-        }
-        // Older meetings recorded before the name-based link was written have no
-        // note_audio_sources row. Associate by exact transcript text, then
-        // persist the link (with its recording name) so the resolver fast-paths
-        // on the next call. Text equality only — timestamps are never a match
-        // key, since multiple recordings can land in one note and updated_at
-        // drifts.
-        if (note && (note.note_type === "meeting" || note.note_type === "personal")) {
-          const matched = this.databaseManager.findMeetingRetentionAudioForNote(note);
-          if (matched != null) {
-            this.databaseManager.registerNoteAudioSource(
-              noteId,
-              matched,
-              this.audioStorageManager.getAudioFileName(matched)
-            );
-            const path = this.audioStorageManager.getAudioPath(matched);
-            if (path) return path;
+      }
+      if (targets.length > 0) return targets;
+
+      // Upload and URL-ingest notes carry their own file path.
+      const note = this.databaseManager.getNote(noteId);
+      if (
+        note &&
+        note.note_type === "upload" &&
+        note.source_file &&
+        fs.existsSync(note.source_file)
+      ) {
+        return [{ path: note.source_file, transcriptionId: null, fileName: note.source_file.split(/[\\/]/).pop() || null }];
+      }
+      // Older meetings recorded before the name-based link was written have no
+      // note_audio_sources row. Associate every recording whose exact text
+      // matches a note segment — a note with N recordings has their transcripts
+      // concatenated, so per-segment equality is what succeeds — and persist the
+      // links (with recording names) so the resolver fast-paths on the next call.
+      // Text equality only — timestamps are never a match key.
+      if (note && (note.note_type === "meeting" || note.note_type === "personal")) {
+        const matched = this.databaseManager.findMeetingRetentionAudioSourcesForNote(note);
+        for (const transcriptionId of matched) {
+          this.databaseManager.registerNoteAudioSource(
+            noteId,
+            transcriptionId,
+            this.audioStorageManager.getAudioFileName(transcriptionId)
+          );
+          const filePath = this.audioStorageManager.getAudioPath(transcriptionId);
+          if (filePath) {
+            targets.push({
+              path: filePath,
+              transcriptionId,
+              fileName:
+                this.audioStorageManager.getAudioFileName(transcriptionId) || null,
+            });
           }
         }
-        return null;
+      }
+      return targets;
+    };
+
+    const resolveNoScribeAudio = ({ transcriptionId, noteId, sourceTranscriptionId }) => {
+      if (noteId != null) {
+        const targets = resolveNoScribeNoteAudioTargets(noteId);
+        if (sourceTranscriptionId != null) {
+          return (
+            targets.find((target) => target.transcriptionId === sourceTranscriptionId)
+              ?.path ?? null
+          );
+        }
+        return targets.length > 0 ? targets[0].path : null;
       }
       return this.audioStorageManager.getAudioPath(transcriptionId);
     };
@@ -1852,30 +1879,65 @@ class IPCHandlers {
       const controller = new AbortController();
       if (requestId) this._noScribeControllers.set(requestId, controller);
       try {
-        const audioPath = resolveNoScribeAudio({
-          transcriptionId: id,
-          noteId: options.noteId,
-          sourceTranscriptionId: options.sourceTranscriptionId,
-        });
-        if (!audioPath) {
+        // When a note is given, transcribe EVERY recording linked to it and join
+        // the transcripts together, each headed by its file name. Single-source
+        // notes and plain history items keep the one-file path.
+        const noteTargets =
+          options.noteId != null ? resolveNoScribeNoteAudioTargets(options.noteId) : [];
+        const targets =
+          noteTargets.length > 0
+            ? noteTargets
+            : [
+                {
+                  path: resolveNoScribeAudio({
+                    transcriptionId: id,
+                    noteId: options.noteId,
+                    sourceTranscriptionId: options.sourceTranscriptionId,
+                  }),
+                  transcriptionId: id,
+                  fileName: null,
+                },
+              ];
+        if (!targets[0]?.path) {
           return { success: false, error: "Recording audio not found", code: noScribe.ERROR_CODES.AUDIO_NOT_FOUND };
         }
-        const outputPath = noScribe.createNoScribeOutputPath(id ?? options.noteId);
-        const { transcript } = await noScribe.transcribeWithNoScribe({
-          audioPath,
-          outputPath,
-          language: options.language,
-          model: options.model,
-          speakerDetection: options.speakerDetection,
-          timestamps: options.timestamps,
-          disfluencies: options.disfluencies,
-          overlapping: options.overlapping,
-          signal: controller.signal,
-          onProgress: (info) => {
-            if (requestId) broadcastToWindows("noscribe-progress", { requestId, ...info });
-          },
-        });
-        noScribe.removeNoScribeOutputFile(outputPath);
+
+        const parts = [];
+        for (const [index, target] of targets.entries()) {
+          const outputPath = noScribe.createNoScribeOutputPath(
+            target.transcriptionId ?? options.noteId ?? id
+          );
+          const { transcript } = await noScribe.transcribeWithNoScribe({
+            audioPath: target.path,
+            outputPath,
+            language: options.language,
+            model: options.model,
+            speakerDetection: options.speakerDetection,
+            timestamps: options.timestamps,
+            disfluencies: options.disfluencies,
+            overlapping: options.overlapping,
+            signal: controller.signal,
+            onProgress: (info) => {
+              if (requestId) broadcastToWindows("noscribe-progress", { requestId, ...info });
+            },
+          });
+          noScribe.removeNoScribeOutputFile(outputPath);
+          const trimmed = (transcript || "").trim();
+          if (!trimmed) continue;
+          parts.push(
+            targets.length > 1
+              ? `## ${target.fileName || `Recording ${index + 1}`}\n\n${trimmed}`
+              : trimmed
+          );
+        }
+        if (parts.length === 0) {
+          return {
+            success: false,
+            error: "noScribe finished but produced no transcript",
+            code: noScribe.ERROR_CODES.TRANSCRIPTION_FAILED,
+          };
+        }
+        const transcript = parts.join("\n\n");
         // Land the result in the note itself so the note keeps a noScribe
         // transcript that doesn't live or die with local history. Local-only.
         if (options.noteId != null) {
@@ -1937,16 +1999,13 @@ class IPCHandlers {
 
     ipcMain.handle("get-note-noscribe-audio-sources", (_event, noteId) => {
       // Recording names + transcription ids linked to the note. The dialog uses
-      // this to let the user pick which recording to re-transcribe when a note
-      // holds several. Only entries whose audio file still exists are returned.
-      const sources = this.databaseManager.getNoteAudioSources(noteId);
-      return sources
-        .map((source) => ({
-          transcriptionId: source.transcription_id,
-          fileName: this.audioStorageManager.getAudioFileName(source.transcription_id) ?? source.file_name ?? null,
-          available: this.audioStorageManager.getAudioPath(source.transcription_id) != null,
-        }))
-        .filter((source) => source.available);
+      // this to tell the user how many recordings a note holds. Only entries
+      // whose audio file still exists are returned.
+      return resolveNoScribeNoteAudioTargets(noteId).map((target) => ({
+        transcriptionId: target.transcriptionId,
+        fileName: target.fileName,
+        available: true,
+      }));
     });
 
     ipcMain.on(
@@ -7809,6 +7868,12 @@ class IPCHandlers {
             this.audioStorageManager.getAudioFileName(result.id)
           );
           this.broadcastToWindows("note-noscribe-audio-source-updated", { noteId });
+        } else {
+          debugLogger.info(
+            "Meeting audio saved to retention with no note link (noteId null)",
+            { transcriptionId: result.id, durationSeconds: Math.round(durationSeconds) },
+            "meeting"
+          );
         }
         debugLogger.info(
           "Meeting audio saved to retention",

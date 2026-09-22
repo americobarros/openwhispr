@@ -3089,7 +3089,7 @@
     "speakerAuto": "Automatisch",
     "speakerNone": "Keine",
     "recording": "Aufnahme",
-    "recordingPlaceholder": "Aufnahme auswählen",
+    "multipleRecordings": "Diese Notiz enthält {{count}} Aufnahmen. Alle werden transkribiert und zu einem Transkript zusammengeführt.",
     "disfluencies": "Unflüssigkeiten aufnehmen",
     "disfluenciesHint": "Füllwörter wie „äh“ und „mhm“ behalten.",
     "overlapping": "Überlappende Sprache",

@@ -1418,7 +1418,7 @@
     "speakerAuto": "تلقائي",
     "speakerNone": "لا شيء",
     "recording": "تسجيل",
-    "recordingPlaceholder": "اختر تسجيلاً",
+    "multipleRecordings": "تحتوي هذه الملاحظة على {{count}} تسجيلات. سيتم نسخها جميعاً ودمجها في نص واحد.",
     "disfluencies": "تضمين الترددات",
     "disfluenciesHint": "الاحتفاظ بكلمات الحشو مثل «أه» و«هم».",
     "overlapping": "كلام متداخل",

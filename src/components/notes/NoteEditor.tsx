@@ -556,22 +556,40 @@ export default function NoteEditor({
     };
   }, [note.id]);
 
+  const refreshNoScribeAudioAvailability = useCallback(
+    () =>
+      Promise.all([
+        window.electronAPI?.hasNoteNoScribeAudio?.(note.id),
+        window.electronAPI?.getNoteNoScribeAudioSources?.(note.id),
+      ]).then(([hasAudio, sources]) => {
+        setNoteHasNoScribeAudio(Boolean(hasAudio));
+        if (sources) setNoteNoScribeAudioSources(sources);
+      }),
+    [note.id]
+  );
+
   // A meeting's retention audio is written asynchronously after stop. When it
   // lands, refresh the audio-availability gate so the note picks up its
   // "Transcribe with noScribe" button without a reopen.
   useEffect(() => {
     const unsubscribe = window.electronAPI?.onNoteNoScribeAudioSourceUpdated?.((info) => {
       if (info.noteId !== note.id) return;
-      void Promise.all([
-        window.electronAPI?.hasNoteNoScribeAudio?.(note.id),
-        window.electronAPI?.getNoteNoScribeAudioSources?.(note.id),
-      ]).then(([hasAudio, sources]) => {
-        setNoteHasNoScribeAudio(Boolean(hasAudio));
-        if (sources) setNoteNoScribeAudioSources(sources);
-      });
+      void refreshNoScribeAudioAvailability();
     });
     return unsubscribe;
-  }, [note.id]);
+  }, [note.id, refreshNoScribeAudioAvailability]);
+
+  // Recording stop can link the audio without the retention broadcast when the
+  // note link arrives at stop time, so refresh when this note's recording ends.
+  const recordingNoteId = useMeetingRecordingStore((s) => s.recordingNoteId);
+  const prevIsRecordingRef = useRef(isRecording);
+  useEffect(() => {
+    const wasRecording = prevIsRecordingRef.current;
+    prevIsRecordingRef.current = isRecording;
+    if (wasRecording && !isRecording && recordingNoteId === note.id) {
+      void refreshNoScribeAudioAvailability();
+    }
+  }, [isRecording, recordingNoteId, note.id, refreshNoScribeAudioAvailability]);
 
   useEffect(() => {
     window.electronAPI?.getSpeakerMappings?.(note.id).then((mappings) => {

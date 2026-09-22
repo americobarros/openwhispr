@@ -2746,7 +2746,7 @@
     "speakerAuto": "自動",
     "speakerNone": "無",
     "recording": "錄音",
-    "recordingPlaceholder": "選擇錄音",
+    "multipleRecordings": "此筆記包含 {{count}} 段錄音。所有錄音都會被轉錄並合併為一份轉錄稿。",
     "disfluencies": "包含口誤詞",
     "disfluenciesHint": "保留「嗯」「呃」等填充詞。",
     "overlapping": "重疊語音",
