@@ -572,6 +572,38 @@ export default function PersonalNotesView({
     (s) => s.recordingNoteId === activeNote?.id && !!s.transcript
   );
   const activeNoteRawTranscript = activeNote?.transcript || "";
+  // Prefer the local noScribe re-transcription for AI prompts / stale-hash when
+  // the user has one — it is usually cleaner diarized text than the live ASR.
+  const [activeNoteNoScribeTranscript, setActiveNoteNoScribeTranscript] = useState<string | null>(
+    null
+  );
+  useEffect(() => {
+    const noteId = activeNote?.id;
+    if (noteId == null) {
+      setActiveNoteNoScribeTranscript(null);
+      return;
+    }
+    let cancelled = false;
+    void window.electronAPI?.getNoteNoScribeTranscript?.(noteId).then((stored) => {
+      if (!cancelled) setActiveNoteNoScribeTranscript(stored || null);
+    });
+    const unsubscribe = window.electronAPI?.onNoteNoScribeTranscript?.((info) => {
+      if (info?.noteId !== noteId) return;
+      if (typeof info.transcript === "string") {
+        setActiveNoteNoScribeTranscript(info.transcript);
+        return;
+      }
+      void window.electronAPI?.getNoteNoScribeTranscript?.(noteId).then((stored) => {
+        setActiveNoteNoScribeTranscript(stored || null);
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [activeNote?.id]);
+  const preferredTranscriptForAi =
+    activeNoteNoScribeTranscript?.trim() || activeNoteRawTranscript;
   const activeDraft = draft?.noteId === activeNote?.id ? draft : null;
   const editorNote = activeNote
     ? {
@@ -587,11 +619,13 @@ export default function PersonalNotesView({
 
   const isEnhancementStale = useMemo(() => {
     if (!editorEnhancedContent || !activeNote?.enhanced_at_content_hash) return false;
-    const currentHash = makeContentHash(`${editorNote?.content ?? ""}\n${activeNoteRawTranscript}`);
+    const currentHash = makeContentHash(
+      `${editorNote?.content ?? ""}\n${preferredTranscriptForAi}`
+    );
     return currentHash !== activeNote.enhanced_at_content_hash;
   }, [
     activeNote?.enhanced_at_content_hash,
-    activeNoteRawTranscript,
+    preferredTranscriptForAi,
     editorEnhancedContent,
     editorNote?.content,
   ]);
@@ -652,40 +686,53 @@ export default function PersonalNotesView({
     if (!editorNote) return;
     const { recordingNoteId: liveNoteId, transcript: liveTranscript } =
       useMeetingRecordingStore.getState();
-    const rawTranscript =
+    // Fresh read so a noScribe run that just finished is picked up even before
+    // the subscription above settles.
+    const storedNoScribe =
+      (await window.electronAPI?.getNoteNoScribeTranscript?.(editorNote.id)) || null;
+    const noScribeTranscript = (storedNoScribe || activeNoteNoScribeTranscript || "").trim();
+    const builtInTranscript =
       (liveNoteId === activeNote?.id ? liveTranscript : "") || activeNoteRawTranscript;
     const noteContent = editorNote.content;
     const hasNotes = !!noteContent.trim();
-    if (!hasNotes && !rawTranscript) return;
+    if (!hasNotes && !noScribeTranscript && !builtInTranscript) return;
 
     let formattedTranscript = "";
     let meetingContext = "";
     let isMeetingNote = false;
     let knownPeople: MentionPerson[] = [];
-    if (rawTranscript) {
-      const segments = parseTranscriptSegments(rawTranscript);
+    const identity: MeetingIdentity = {
+      selfName: user?.name?.trim() || null,
+      selfEmail: user?.email?.trim() || null,
+      participants: parseNoteParticipants(editorNote.participants),
+    };
+    const selfLabel = identity.selfName || t("notes.speaker.you");
+    const mappingRows =
+      (await window.electronAPI?.getSpeakerMappings?.(editorNote.id).catch(() => [])) || [];
+    const speakerMappings: Record<string, string> = {};
+    for (const m of mappingRows) speakerMappings[m.speaker_id] = m.display_name;
+
+    if (noScribeTranscript) {
+      // noScribe already emits labeled speaker turns as plain text/markdown —
+      // feed it through as-is rather than re-deriving from the built-in ASR.
+      isMeetingNote = true;
+      meetingContext = buildMeetingContext(identity, selfLabel);
+      formattedTranscript = noScribeTranscript;
+      knownPeople = collectKnownPeople(identity, speakerMappings, []);
+    } else if (builtInTranscript) {
+      const segments = parseTranscriptSegments(builtInTranscript);
       if (segments.length > 0) {
         isMeetingNote = true;
-        const mappingRows =
-          (await window.electronAPI?.getSpeakerMappings?.(editorNote.id).catch(() => [])) || [];
-        const speakerMappings: Record<string, string> = {};
-        for (const m of mappingRows) speakerMappings[m.speaker_id] = m.display_name;
-
-        const identity: MeetingIdentity = {
-          selfName: user?.name?.trim() || null,
-          selfEmail: user?.email?.trim() || null,
-          participants: parseNoteParticipants(editorNote.participants),
-        };
-        const selfLabel = identity.selfName || t("notes.speaker.you");
         meetingContext = buildMeetingContext(identity, selfLabel);
         formattedTranscript = buildLlmTranscript(segments, speakerMappings, selfLabel, t);
         knownPeople = collectKnownPeople(identity, speakerMappings, segments);
       }
       if (!formattedTranscript) {
-        formattedTranscript = rawTranscript;
+        formattedTranscript = builtInTranscript;
       }
     }
 
+    const transcriptForHash = noScribeTranscript || builtInTranscript;
     const parts = [
       hasNotes ? noteContent : "",
       meetingContext,
@@ -693,7 +740,7 @@ export default function PersonalNotesView({
     ]
       .filter(Boolean)
       .join("\n\n");
-    runAction(action, parts, makeContentHash(`${noteContent}\n${rawTranscript}`), {
+    runAction(action, parts, makeContentHash(`${noteContent}\n${transcriptForHash}`), {
       isCloudMode,
       modelId: effectiveModelId,
       isMeetingNote,
@@ -803,7 +850,7 @@ export default function PersonalNotesView({
                   disabled={
                     (!editorNote?.content?.trim() &&
                       !hasLiveTranscript &&
-                      !activeNoteRawTranscript) ||
+                      !preferredTranscriptForAi) ||
                     actionProcessingState === "processing"
                   }
                 />

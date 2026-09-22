@@ -402,7 +402,9 @@ export default function NoteEditor({
     folderId: note.folder_id,
     noteTitle: note.title,
     noteContent: note.content,
-    noteTranscript: note.transcript ?? undefined,
+    // Prefer the noScribe re-transcription when present — it is usually the
+    // cleaner diarized text and is what the user sees under that tab.
+    noteTranscript: (noScribeTranscript?.trim() || note.transcript) ?? undefined,
   });
   const titleRef = useRef<HTMLDivElement>(null);
   const prevNoteIdRef = useRef<number>(note.id);
