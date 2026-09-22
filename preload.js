@@ -188,6 +188,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("noscribe-progress", listener);
     return () => ipcRenderer.removeListener("noscribe-progress", listener);
   },
+  getNoteNoScribeTranscript: (noteId) => ipcRenderer.invoke("get-note-noscribe-transcript", noteId),
+  hasNoteNoScribeAudio: (noteId) => ipcRenderer.invoke("has-note-noscribe-audio", noteId),
+  getNoteNoScribeAudioSources: (noteId) => ipcRenderer.invoke("get-note-noscribe-audio-sources", noteId),
+  onNoteNoScribeAudioSourceUpdated: (callback) => {
+    const listener = (_event, info) => callback?.(info);
+    ipcRenderer.on("note-noscribe-audio-source-updated", listener);
+    return () => ipcRenderer.removeListener("note-noscribe-audio-source-updated", listener);
+  },
+  onNoteNoScribeTranscript: (callback) => {
+    const listener = (_event, info) => callback?.(info);
+    ipcRenderer.on("note-noscribe-transcript", listener);
+    return () => ipcRenderer.removeListener("note-noscribe-transcript", listener);
+  },
 
   // Dictionary functions
   getDictionary: () => ipcRenderer.invoke("db-get-dictionary"),

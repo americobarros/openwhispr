@@ -16,7 +16,7 @@ import {
   Users,
 } from "./icons";
 import { cn } from "./lib/utils";
-import type { TranscriptionItem as TranscriptionItemType } from "../types/electron";
+import type { NoteItem, TranscriptionItem as TranscriptionItemType } from "../types/electron";
 
 const NO_SCRIBE_LANGUAGES: ReadonlyArray<{ code: string; label: string }> = [
   { code: "auto", label: "Auto" },
@@ -85,6 +85,9 @@ interface NoScribeTranscribeDialogProps {
   item: TranscriptionItemType | null;
   onOpenChange: (open: boolean) => void;
   onCopy: (text: string) => void;
+  note?: NoteItem | null;
+  onTranscribed?: (transcript: string) => void;
+  audioSources?: { transcriptionId: number; fileName: string | null; available: boolean }[];
 }
 
 type Stage = "loading" | "configure" | "not-installed" | "running" | "result" | "error";
@@ -94,6 +97,9 @@ export default function NoScribeTranscribeDialog({
   item,
   onOpenChange,
   onCopy,
+  note,
+  onTranscribed,
+  audioSources = [],
 }: NoScribeTranscribeDialogProps) {
   const { t } = useTranslation();
   const [stage, setStage] = useState<Stage>("loading");
@@ -110,6 +116,7 @@ export default function NoScribeTranscribeDialog({
   const [transcriptionId, setTranscriptionId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [progress, setProgress] = useState<{ stage: string; bytes?: number } | null>(null);
+  const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const progressUnsubRef = useRef<(() => void) | null>(null);
 
@@ -120,6 +127,7 @@ export default function NoScribeTranscribeDialog({
     setTranscriptionId(null);
     setCopied(false);
     setProgress(null);
+    setSelectedSourceId(null);
   }, []);
 
   useEffect(() => {
@@ -158,7 +166,8 @@ export default function NoScribeTranscribeDialog({
   }, [cancelRunning]);
 
   const handleTranscribe = useCallback(async () => {
-    if (!item) return;
+    const sourceId = note ? note.id : item?.id ?? null;
+    if (sourceId == null) return;
     const requestId = crypto.randomUUID();
     requestIdRef.current = requestId;
     setError(null);
@@ -170,7 +179,9 @@ export default function NoScribeTranscribeDialog({
     });
     progressUnsubRef.current = unsubscribe;
     try {
-      const result = await window.electronAPI.transcribeWithNoScribe(item.id, {
+      const sourceTranscriptionId =
+        note && audioSources.length > 1 ? (selectedSourceId ?? audioSources[0]?.transcriptionId) : undefined;
+      const result = await window.electronAPI.transcribeWithNoScribe(sourceId, {
         requestId,
         language,
         model,
@@ -178,6 +189,8 @@ export default function NoScribeTranscribeDialog({
         timestamps,
         disfluencies,
         overlapping,
+        noteId: note ? note.id : undefined,
+        sourceTranscriptionId,
       });
       unsubscribe();
       progressUnsubRef.current = null;
@@ -186,6 +199,7 @@ export default function NoScribeTranscribeDialog({
         setTranscript(result.transcript);
         setTranscriptionId(result.transcriptionId ?? null);
         setStage("result");
+        onTranscribed?.(result.transcript);
       } else if (result.code === "NO_SCRIBE_CANCELED") {
         setStage("configure");
       } else {
@@ -199,7 +213,7 @@ export default function NoScribeTranscribeDialog({
       setError(err instanceof Error ? err.message : String(err));
       setStage("error");
     }
-  }, [item, language, model, speakerDetection, timestamps, disfluencies, overlapping, t]);
+  }, [note, item, language, model, speakerDetection, timestamps, disfluencies, overlapping, t, onTranscribed, audioSources, selectedSourceId]);
 
   const handleCancel = useCallback(() => {
     cancelRunning();
@@ -207,11 +221,16 @@ export default function NoScribeTranscribeDialog({
   }, [cancelRunning]);
 
   const handleOpenInNoScribe = useCallback(async () => {
-    if (!item) return;
+    const sourceId = note ? note.id : item?.id ?? null;
+    if (sourceId == null) return;
     try {
-      const result = await window.electronAPI.openNoScribeFile(item.id, {
+      const sourceTranscriptionId =
+        note && audioSources.length > 1 ? (selectedSourceId ?? audioSources[0]?.transcriptionId) : undefined;
+      const result = await window.electronAPI.openNoScribeFile(sourceId, {
         model,
         speakerDetection,
+        noteId: note ? note.id : undefined,
+        sourceTranscriptionId,
       });
       if (result.success) {
         onOpenChange(false);
@@ -225,7 +244,7 @@ export default function NoScribeTranscribeDialog({
       setError(err instanceof Error ? err.message : String(err));
       setStage("error");
     }
-  }, [item, model, speakerDetection, onOpenChange, t]);
+  }, [note, item, model, speakerDetection, onOpenChange, t, audioSources, selectedSourceId]);
 
   const handleCopy = useCallback(async () => {
     await onCopy(transcript);
@@ -328,6 +347,30 @@ export default function NoScribeTranscribeDialog({
               </div>
             </div>
 
+            {note && audioSources.length > 1 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="noscribe-source">{t("noscribe.recording")}</Label>
+                <Select
+                  value={selectedSourceId != null ? String(selectedSourceId) : ""}
+                  onValueChange={(value) => setSelectedSourceId(Number(value))}
+                >
+                  <SelectTrigger id="noscribe-source" className="w-full">
+                    <SelectValue placeholder={t("noscribe.recordingPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {audioSources.map((source) => (
+                      <SelectItem key={source.transcriptionId} value={String(source.transcriptionId)}>
+                        <span className="flex items-center gap-2">
+                          <AudioLines size={13} className="text-muted-foreground" />
+                          {source.fileName || String(source.transcriptionId)}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="noscribe-speakers">{t("noscribe.speakers")}</Label>
               <Select value={speakerDetection} onValueChange={setSpeakerDetection}>
@@ -404,7 +447,9 @@ export default function NoScribeTranscribeDialog({
               {transcript}
             </div>
             {transcriptionId != null && (
-              <p className="text-xs text-muted-foreground">{t("noscribe.savedToHistory")}</p>
+              <p className="text-xs text-muted-foreground">
+                {note ? t("noscribe.savedToNote") : t("noscribe.savedToHistory")}
+              </p>
             )}
           </div>
         )}

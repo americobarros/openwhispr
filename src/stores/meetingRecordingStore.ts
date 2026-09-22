@@ -1616,7 +1616,8 @@ export async function stopRecording(expectedSessionId?: string): Promise<StopRec
         let stoppedDiarizationSessionId: string | null = null;
         try {
           const result = await window.electronAPI?.meetingTranscriptionStop?.(
-            sessionId ?? undefined
+            sessionId ?? undefined,
+            { noteId: useMeetingRecordingStore.getState().recordingNoteId ?? null }
           );
           if (result?.diarizationSessionId) {
             stoppedDiarizationSessionId = result.diarizationSessionId;

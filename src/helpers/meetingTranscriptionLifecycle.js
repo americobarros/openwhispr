@@ -36,7 +36,7 @@ function createMeetingTranscriptionLifecycle({ start, stop, onError = () => {} }
     return sessions.values().next().value ?? null;
   };
 
-  const stopSession = (expectedSessionId) => {
+  const stopSession = (expectedSessionId, options = {}) => {
     const session = resolveSession(expectedSessionId);
     if (!session) {
       return Promise.resolve({ success: false, reason: "stale-session" });
@@ -48,7 +48,7 @@ function createMeetingTranscriptionLifecycle({ start, stop, onError = () => {} }
     session.stopPromise = enqueue(async () => {
       try {
         if (!session.startSucceeded) return { success: true };
-        return await stop(session.sessionId);
+        return await stop(session.sessionId, options);
       } finally {
         removeSession(session);
       }

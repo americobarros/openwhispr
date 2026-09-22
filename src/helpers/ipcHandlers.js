@@ -1764,8 +1764,59 @@ class IPCHandlers {
 
     // noScribe integration: re-transcribe a saved recording (meeting notes,
     // dictations) with the user's installed noScribe app. The recording audio
-    // is resolved by transcription id through the same storage all playback
-    // uses, so no foreign file paths ever reach the renderer.
+    // is resolved from a transcription id, or — when a noteId is passed — from
+    // the note itself (upload notes carry their own file, meeting notes point
+    // at their retention-saved recording), so no foreign file paths ever reach
+    // the renderer.
+    const resolveNoScribeAudio = ({ transcriptionId, noteId, sourceTranscriptionId }) => {
+      if (noteId != null) {
+        // A note's recordings are linked by name in note_audio_sources — never
+        // a bare id match (note ids share the autoincrement space with
+        // transcription ids, so probing the audio store with the note id can
+        // hand back an unrelated recording). Callers may pick one recording
+        // explicitly when a note holds several.
+        const sources = this.databaseManager.getNoteAudioSources(noteId);
+        const wanted =
+          sourceTranscriptionId != null
+            ? sources.find((s) => s.transcription_id === sourceTranscriptionId)
+            : sources[0];
+        if (wanted != null) {
+          const path = this.audioStorageManager.getAudioPath(wanted.transcription_id);
+          if (path) return path;
+        }
+        // Upload and URL-ingest notes carry their own file path.
+        const note = this.databaseManager.getNote(noteId);
+        if (
+          note &&
+          note.note_type === "upload" &&
+          note.source_file &&
+          fs.existsSync(note.source_file)
+        ) {
+          return note.source_file;
+        }
+        // Older meetings recorded before the name-based link was written have no
+        // note_audio_sources row. Associate by exact transcript text, then
+        // persist the link (with its recording name) so the resolver fast-paths
+        // on the next call. Text equality only — timestamps are never a match
+        // key, since multiple recordings can land in one note and updated_at
+        // drifts.
+        if (note && (note.note_type === "meeting" || note.note_type === "personal")) {
+          const matched = this.databaseManager.findMeetingRetentionAudioForNote(note);
+          if (matched != null) {
+            this.databaseManager.registerNoteAudioSource(
+              noteId,
+              matched,
+              this.audioStorageManager.getAudioFileName(matched)
+            );
+            const path = this.audioStorageManager.getAudioPath(matched);
+            if (path) return path;
+          }
+        }
+        return null;
+      }
+      return this.audioStorageManager.getAudioPath(transcriptionId);
+    };
+
     ipcMain.handle("get-noscribe-status", () => {
       return noScribe.getNoScribeStatus();
     });
@@ -1776,7 +1827,11 @@ class IPCHandlers {
 
     ipcMain.handle("noscribe-open-file", async (_event, id, options = {}) => {
       try {
-        const audioPath = this.audioStorageManager.getAudioPath(id);
+        const audioPath = resolveNoScribeAudio({
+          transcriptionId: id,
+          noteId: options.noteId,
+          sourceTranscriptionId: options.sourceTranscriptionId,
+        });
         if (!audioPath) {
           return { success: false, error: "Recording audio not found", code: noScribe.ERROR_CODES.AUDIO_NOT_FOUND };
         }
@@ -1797,11 +1852,15 @@ class IPCHandlers {
       const controller = new AbortController();
       if (requestId) this._noScribeControllers.set(requestId, controller);
       try {
-        const audioPath = this.audioStorageManager.getAudioPath(id);
+        const audioPath = resolveNoScribeAudio({
+          transcriptionId: id,
+          noteId: options.noteId,
+          sourceTranscriptionId: options.sourceTranscriptionId,
+        });
         if (!audioPath) {
           return { success: false, error: "Recording audio not found", code: noScribe.ERROR_CODES.AUDIO_NOT_FOUND };
         }
-        const outputPath = noScribe.createNoScribeOutputPath(id);
+        const outputPath = noScribe.createNoScribeOutputPath(id ?? options.noteId);
         const { transcript } = await noScribe.transcribeWithNoScribe({
           audioPath,
           outputPath,
@@ -1817,6 +1876,24 @@ class IPCHandlers {
           },
         });
         noScribe.removeNoScribeOutputFile(outputPath);
+        // Land the result in the note itself so the note keeps a noScribe
+        // transcript that doesn't live or die with local history. Local-only.
+        if (options.noteId != null) {
+          try {
+            this.databaseManager.setNoteNoScribeTranscript(
+              options.noteId,
+              transcript,
+              options.model || null
+            );
+            broadcastToWindows("note-noscribe-transcript", { noteId: options.noteId });
+          } catch (saveError) {
+            debugLogger.warn(
+              "Failed to save noScribe transcript to note",
+              { error: saveError.message },
+              "noscribe"
+            );
+          }
+        }
         // Land the result in history so it is discoverable next to the
         // original meeting recording. A failed save never fails the request —
         // the transcript is still returned to the dialog.
@@ -1848,6 +1925,28 @@ class IPCHandlers {
       const controller = requestId ? this._noScribeControllers.get(requestId) : null;
       if (controller) controller.abort();
       return { success: Boolean(controller) };
+    });
+
+    ipcMain.handle("get-note-noscribe-transcript", (_event, noteId) => {
+      return this.databaseManager.getNoteNoScribeTranscript(noteId);
+    });
+
+    ipcMain.handle("has-note-noscribe-audio", (_event, noteId) => {
+      return Boolean(resolveNoScribeAudio({ transcriptionId: null, noteId }));
+    });
+
+    ipcMain.handle("get-note-noscribe-audio-sources", (_event, noteId) => {
+      // Recording names + transcription ids linked to the note. The dialog uses
+      // this to let the user pick which recording to re-transcribe when a note
+      // holds several. Only entries whose audio file still exists are returned.
+      const sources = this.databaseManager.getNoteAudioSources(noteId);
+      return sources
+        .map((source) => ({
+          transcriptionId: source.transcription_id,
+          fileName: this.audioStorageManager.getAudioFileName(source.transcription_id) ?? source.file_name ?? null,
+          available: this.audioStorageManager.getAudioPath(source.transcription_id) != null,
+        }))
+        .filter((source) => source.available);
     });
 
     ipcMain.on(
@@ -7654,7 +7753,7 @@ class IPCHandlers {
       meetingRetentionStartedAt = null;
     };
 
-    const saveMeetingAudioRetention = async ({ transcript, micPath, systemPath, startedAt, endedAt }) => {
+    const saveMeetingAudioRetention = async ({ transcript, micPath, systemPath, startedAt, endedAt, noteId }) => {
       const durationSeconds =
         startedAt != null && endedAt != null ? (endedAt - startedAt) / 1000 : 0;
       try {
@@ -7699,6 +7798,17 @@ class IPCHandlers {
         const updated = this.databaseManager.getTranscriptionById(result.id);
         if (updated) {
           this.broadcastToWindows("transcription-added", updated);
+        }
+        // Keep a local link from the meeting note to the retained audio so the
+        // note can be re-transcribed with noScribe without hunting for a path.
+        // Local-only (see note_audio_sources in database.js) — never synced.
+        if (noteId != null) {
+          this.databaseManager.registerNoteAudioSource(
+            noteId,
+            result.id,
+            this.audioStorageManager.getAudioFileName(result.id)
+          );
+          this.broadcastToWindows("note-noscribe-audio-source-updated", { noteId });
         }
         debugLogger.info(
           "Meeting audio saved to retention",
@@ -9164,7 +9274,13 @@ class IPCHandlers {
       sendMeetingAudio(audioBuffer, source);
     });
 
-    const stopMeetingTranscription = async (expectedSessionId) => {
+    const stopMeetingTranscription = async (expectedSessionId, options = {}) => {
+      // The renderer owns the recording note and reports it at stop as a belt-
+      // and-braces fallback: retention ringing out a note->recording link depends
+      // on a noteId, and the start-time pipe has been observed arriving empty.
+      if (meetingNoteId == null && options != null && options.noteId != null) {
+        meetingNoteId = options.noteId;
+      }
       // Only a *different* live session blocks teardown — it owns the shared
       // capture now. With no engine session (e.g. after quit-path engine stop)
       // the streams below must still be torn down.
@@ -9232,6 +9348,7 @@ class IPCHandlers {
             systemPath: retentionState.systemPath,
             startedAt: retentionState.startedAt,
             endedAt: retentionState.endedAt,
+            noteId: noteIdSnapshot,
           });
 
           return { success: true, transcript, diarizationSessionId };
@@ -9267,6 +9384,7 @@ class IPCHandlers {
           systemPath: retentionState.systemPath,
           startedAt: retentionState.startedAt,
           endedAt: retentionState.endedAt,
+          noteId: noteIdSnapshot,
         });
 
         return { success: true, transcript, diarizationSessionId };
@@ -9280,7 +9398,7 @@ class IPCHandlers {
     const meetingTranscriptionLifecycle = createMeetingTranscriptionLifecycle({
       start: ({ sessionId, ownerWebContents, options }) =>
         startMeetingTranscription({ sender: ownerWebContents }, { ...options, sessionId }),
-      stop: (sessionId) => stopMeetingTranscription(sessionId),
+      stop: (sessionId, options) => stopMeetingTranscription(sessionId, options),
       onError: (error, sessionId) => {
         debugLogger.error(
           "Meeting transcription owner-loss teardown failed",
@@ -9302,8 +9420,8 @@ class IPCHandlers {
       });
     });
 
-    ipcMain.handle("meeting-transcription-stop", (_event, expectedSessionId) =>
-      meetingTranscriptionLifecycle.stopSession(expectedSessionId)
+    ipcMain.handle("meeting-transcription-stop", (_event, expectedSessionId, options = {}) =>
+      meetingTranscriptionLifecycle.stopSession(expectedSessionId, options)
     );
 
     ipcMain.handle(

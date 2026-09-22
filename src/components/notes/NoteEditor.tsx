@@ -8,6 +8,7 @@ import {
   AlignLeft,
   MessageSquareText,
   Mic,
+  AudioLines,
   LinkIcon,
   Link2,
   Lock,
@@ -84,6 +85,7 @@ import {
   resolveSegmentSpeakerName,
 } from "../../utils/speakerNameResolution";
 import NoteParticipants from "./NoteParticipants";
+import NoScribeTranscribeDialog from "../NoScribeTranscribeDialog";
 import type { CalendarAttendee } from "../../types/calendar";
 import { observeFloatingChatLayout } from "./floatingChatLayout";
 import {
@@ -113,7 +115,7 @@ export interface Enhancement {
   onChange: (sourceNoteId: number, content: string) => void;
 }
 
-type MeetingViewMode = "raw" | "transcript" | "enhanced";
+type MeetingViewMode = "raw" | "transcript" | "enhanced" | "noscribe";
 
 type SpeakerProfileOption = { id?: number; display_name: string; email: string | null };
 
@@ -265,6 +267,12 @@ export default function NoteEditor({
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareIntent, setShareIntent] = useState<"open" | "copy-link">("open");
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [noScribeDialogOpen, setNoScribeDialogOpen] = useState(false);
+  const [noScribeTranscript, setNoScribeTranscript] = useState<string | null>(null);
+  const [noteHasNoScribeAudio, setNoteHasNoScribeAudio] = useState(false);
+  const [noteNoScribeAudioSources, setNoteNoScribeAudioSources] = useState<
+    { transcriptionId: number; fileName: string | null; available: boolean }[]
+  >([]);
   const [aclRetryVersion, setAclRetryVersion] = useState(0);
   const [aclRequest, setAclRequest] = useState<{
     cloudId: string;
@@ -520,6 +528,50 @@ export default function NoteEditor({
       });
     }
   }, [note.id, note.title, defaultViewMode, scheduleUiUpdate]);
+
+  // Load the note's stored noScribe transcript (keeps the tab alive across
+  // sessions) and whether this note has audio noScribe can re-transcribe. The
+  // savedToNote flow writes straight to the DB before it touches the dialog, so
+  // a fresh fetch picks up a run from any window.
+  useEffect(() => {
+    let cancelled = false;
+    const loadNoScribeState = async () => {
+      const [stored, hasAudio, sources] = await Promise.all([
+        window.electronAPI?.getNoteNoScribeTranscript?.(note.id),
+        window.electronAPI?.hasNoteNoScribeAudio?.(note.id),
+        window.electronAPI?.getNoteNoScribeAudioSources?.(note.id),
+      ]);
+      if (cancelled) return;
+      setNoScribeTranscript(stored || null);
+      setNoteHasNoScribeAudio(Boolean(hasAudio));
+      setNoteNoScribeAudioSources(sources || []);
+    };
+    setNoScribeTranscript(null);
+    setNoteHasNoScribeAudio(false);
+    setNoteNoScribeAudioSources([]);
+    setNoScribeDialogOpen(false);
+    void loadNoScribeState();
+    return () => {
+      cancelled = true;
+    };
+  }, [note.id]);
+
+  // A meeting's retention audio is written asynchronously after stop. When it
+  // lands, refresh the audio-availability gate so the note picks up its
+  // "Transcribe with noScribe" button without a reopen.
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onNoteNoScribeAudioSourceUpdated?.((info) => {
+      if (info.noteId !== note.id) return;
+      void Promise.all([
+        window.electronAPI?.hasNoteNoScribeAudio?.(note.id),
+        window.electronAPI?.getNoteNoScribeAudioSources?.(note.id),
+      ]).then(([hasAudio, sources]) => {
+        setNoteHasNoScribeAudio(Boolean(hasAudio));
+        if (sources) setNoteNoScribeAudioSources(sources);
+      });
+    });
+    return unsubscribe;
+  }, [note.id]);
 
   useEffect(() => {
     window.electronAPI?.getSpeakerMappings?.(note.id).then((mappings) => {
@@ -920,6 +972,17 @@ export default function NoteEditor({
               dateLabel={shortDate || undefined}
               dateTitle={noteDate}
             />
+            {noteHasNoScribeAudio && (
+              <button
+                type="button"
+                onClick={() => setNoScribeDialogOpen(true)}
+                className={NOTE_META_CHIP_CLASS}
+                aria-label={t("notes.editor.transcribeNoScribe")}
+              >
+                <AudioLines size={14} className="shrink-0 text-foreground/60" />
+                {t("notes.editor.transcribeNoScribe")}
+              </button>
+            )}
             {calendarEventName && (
               <span className={cn(NOTE_META_CHIP_CLASS, "cursor-default")}>
                 <LinkIcon size={14} className="shrink-0 text-foreground/60" />
@@ -1103,6 +1166,22 @@ export default function NoteEditor({
                   {isRecording ? <RecordingWave /> : <MessageSquareText size={12} />}
                   {t("notes.editor.transcript")}
                 </button>
+                {noScribeTranscript != null && (
+                  <button
+                    data-segment-button
+                    data-segment-value="noscribe"
+                    onClick={() => setViewMode("noscribe")}
+                    className={cn(
+                      SEGMENT_BUTTON_CLASS,
+                      viewMode === "noscribe"
+                        ? "text-foreground"
+                        : "text-foreground/60 hover:text-foreground/80"
+                    )}
+                  >
+                    <Sparkles size={12} />
+                    {t("notes.editor.noScribeTranscript")}
+                  </button>
+                )}
                 <button
                   data-segment-button
                   data-segment-value="raw"
@@ -1270,6 +1349,8 @@ export default function NoteEditor({
                   </Button>
                 )}
               </EmptyStateCard>
+            ) : viewMode === "noscribe" && noScribeTranscript ? (
+              <RichTextEditor value={noScribeTranscript} disabled />
             ) : viewMode === "enhanced" && enhancement ? (
               <RichTextEditor
                 value={enhancement.content}
@@ -1356,6 +1437,19 @@ export default function NoteEditor({
           onNewChat={embeddedChat.startNewChat}
         />
       )}
+      <NoScribeTranscribeDialog
+        open={noScribeDialogOpen}
+        item={null}
+        note={note}
+        audioSources={noteNoScribeAudioSources}
+        onOpenChange={setNoScribeDialogOpen}
+        onCopy={(text) => void navigator.clipboard?.writeText(text)}
+        onTranscribed={(transcript) => {
+          setNoScribeTranscript(transcript);
+          setViewMode("noscribe");
+          setNoScribeDialogOpen(false);
+        }}
+      />
       <ShareNoteDialog
         open={shareDialogOpen}
         onOpenChange={setShareDialogOpen}

@@ -383,6 +383,55 @@ class DatabaseManager {
         )
         .run();
 
+      // Local-only noScribe transcripts and note→audio-source links. These are
+      // deliberately NOT synced: they describe local artifacts (a noScribe run,
+      // a retention-saved meeting recording) that mean nothing on another device.
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS note_noscribe_transcripts (
+          note_id INTEGER PRIMARY KEY,
+          transcript TEXT NOT NULL,
+          model TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS note_audio_sources (
+          note_id INTEGER NOT NULL,
+          transcription_id INTEGER NOT NULL,
+          file_name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (note_id, transcription_id)
+        )
+      `);
+
+      // Mirrors pre-1.10.3 schema that keyed the table on note_id alone. Rebuild
+      // it as 1:N so a note can hold several recordings, keeping whatever links
+      // an earlier build wrote.
+      const noteAudioSourceColumns = this.db
+        .prepare("PRAGMA table_info(note_audio_sources)")
+        .all()
+        .map((col) => col.name);
+      if (!noteAudioSourceColumns.includes("file_name")) {
+        this.db.exec(`
+          CREATE TABLE note_audio_sources_migrated (
+            note_id INTEGER NOT NULL,
+            transcription_id INTEGER NOT NULL,
+            file_name TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (note_id, transcription_id)
+          );
+          INSERT OR IGNORE INTO note_audio_sources_migrated (note_id, transcription_id, created_at)
+            SELECT note_id, transcription_id, created_at FROM note_audio_sources;
+          DROP TABLE note_audio_sources;
+          ALTER TABLE note_audio_sources_migrated RENAME TO note_audio_sources;
+        `);
+      }
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_note_audio_sources_note ON note_audio_sources(note_id)");
+      this.db.exec(
+        "CREATE INDEX IF NOT EXISTS idx_note_audio_sources_transcription ON note_audio_sources(transcription_id)"
+      );
+
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS folders (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2949,6 +2998,150 @@ class DatabaseManager {
     } catch (error) {
       debugLogger.error("Error getting note", { error: error.message }, "notes");
       throw error;
+    }
+  }
+
+  setNoteNoScribeTranscript(noteId, transcript, model = null) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db
+        .prepare(
+          `INSERT INTO note_noscribe_transcripts (note_id, transcript, model, created_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(note_id) DO UPDATE SET
+             transcript = excluded.transcript,
+             model = excluded.model,
+             created_at = CURRENT_TIMESTAMP`
+        )
+        .run(noteId, transcript, model);
+    } catch (error) {
+      debugLogger.error(
+        "Error saving note noScribe transcript",
+        { error: error.message, noteId },
+        "notes"
+      );
+      throw error;
+    }
+  }
+
+  getNoteNoScribeTranscript(noteId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const row = this.db
+        .prepare("SELECT transcript FROM note_noscribe_transcripts WHERE note_id = ?")
+        .get(noteId);
+      return row ? row.transcript : null;
+    } catch (error) {
+      debugLogger.error(
+        "Error getting note noScribe transcript",
+        { error: error.message, noteId },
+        "notes"
+      );
+      throw error;
+    }
+  }
+
+  registerNoteAudioSource(noteId, transcriptionId, fileName = null) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db
+        .prepare(
+          `INSERT INTO note_audio_sources (note_id, transcription_id, file_name, created_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(note_id, transcription_id) DO UPDATE SET
+             file_name = excluded.file_name`
+        )
+        .run(noteId, transcriptionId, fileName);
+    } catch (error) {
+      debugLogger.error(
+        "Error registering note audio source",
+        { error: error.message, noteId },
+        "notes"
+      );
+      throw error;
+    }
+  }
+
+  getNoteAudioSources(noteId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db
+        .prepare(
+          `SELECT note_id, transcription_id, file_name, created_at
+             FROM note_audio_sources
+            WHERE note_id = ?
+            ORDER BY created_at`
+        )
+        .all(noteId);
+    } catch (error) {
+      debugLogger.error(
+        "Error getting note audio sources",
+        { error: error.message, noteId },
+        "notes"
+      );
+      throw error;
+    }
+  }
+
+  _noteTranscriptPlainText(note) {
+    if (!note?.transcript) return "";
+    let parsed;
+    try {
+      parsed = JSON.parse(note.transcript);
+    } catch {
+      return typeof note.transcript === "string" ? note.transcript : "";
+    }
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((segment) => (typeof segment?.text === "string" ? segment.text : ""))
+        .join(" ")
+        .trim();
+    }
+    return typeof note.transcript === "string" ? note.transcript : "";
+  }
+
+  /**
+   * Legacy association for recordings saved before the name-based link existed:
+   * a note whose transcript text equals a retained meeting recording's text is
+   * that recording's owner. Exact equality only — no time-of-day matching, since
+   * updated_at drifts and a bare time match can attach an unrelated meeting.
+   * Transcriptions already claimed by another note are never reused. Going
+   * forward the link is written at save time (registerNoteAudioSource), so this
+   * only ever fires once per note and fast-paths afterward.
+   */
+  findMeetingRetentionAudioForNote(note) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const noteText = this._noteTranscriptPlainText(note);
+      if (!noteText) return null;
+
+      const rows = this.db
+        .prepare(
+          `SELECT id, text, created_at
+             FROM transcriptions
+            WHERE route_kind = 'meeting'
+              AND has_audio = 1
+              AND id NOT IN (SELECT transcription_id FROM note_audio_sources)`
+        )
+        .all();
+      const normalize = (value) =>
+        (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const wanted = normalize(noteText);
+      const exact = rows.filter((row) => normalize(row.text) === wanted);
+      if (exact.length === 0) return null;
+
+      // On a tie, the most recent recording wins.
+      exact.sort((a, b) =>
+        String(b.created_at || "").localeCompare(String(a.created_at || ""))
+      );
+      return exact[0].id;
+    } catch (error) {
+      debugLogger.error(
+        "Error matching meeting retention audio",
+        { error: error.message, noteId: note?.id },
+        "meeting"
+      );
+      return null;
     }
   }
 

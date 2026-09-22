@@ -69,6 +69,13 @@ class AudioStorageManager {
     return null;
   }
 
+  // Recording file name for a transcription id, e.g. "OpenWhispr-2026-09-22-02-20-00-20.webm".
+  // This is what gets stored next to a note's audio-source link.
+  getAudioFileName(transcriptionId) {
+    const filePath = this.getAudioPath(transcriptionId);
+    return filePath ? path.basename(filePath) : null;
+  }
+
   getAudioBuffer(transcriptionId) {
     const filePath = this.getAudioPath(transcriptionId);
     if (!filePath) return null;

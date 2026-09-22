@@ -1337,7 +1337,12 @@ declare global {
       listNoScribeModels: () => Promise<string[]>;
       openNoScribeFile: (
         id: number,
-        options?: { model?: string; speakerDetection?: string }
+        options?: {
+          model?: string;
+          speakerDetection?: string;
+          noteId?: number;
+          sourceTranscriptionId?: number;
+        }
       ) => Promise<{ success: boolean; error?: string; code?: string; executablePath?: string }>;
       transcribeWithNoScribe: (
         id: number,
@@ -1349,6 +1354,8 @@ declare global {
           timestamps?: boolean;
           disfluencies?: boolean;
           overlapping?: boolean;
+          noteId?: number;
+          sourceTranscriptionId?: number;
         }
       ) => Promise<{
         success: boolean;
@@ -1360,6 +1367,19 @@ declare global {
       cancelNoScribeTranscription: (requestId: string) => Promise<{ success: boolean }>;
       onNoScribeProgress: (
         callback: (info: { requestId: string; stage: string; bytes?: number }) => void
+      ) => () => void;
+      getNoteNoScribeTranscript: (noteId: number) => Promise<string | null>;
+      hasNoteNoScribeAudio: (noteId: number) => Promise<boolean>;
+      getNoteNoScribeAudioSources: (
+        noteId: number
+      ) => Promise<
+        { transcriptionId: number; fileName: string | null; available: boolean }[]
+      >;
+      onNoteNoScribeAudioSourceUpdated: (
+        callback: (info: { noteId: number }) => void
+      ) => () => void;
+      onNoteNoScribeTranscript: (
+        callback: (info: { noteId: number }) => void
       ) => () => void;
       syncRetentionSettings?: (settings: {
         audioRetentionDays: number;
@@ -2942,7 +2962,10 @@ declare global {
         sessionId: string,
         available: boolean
       ) => Promise<{ success: boolean; reason?: "stale-session" }>;
-      meetingTranscriptionStop?: (expectedSessionId?: string) => Promise<{
+      meetingTranscriptionStop?: (
+        expectedSessionId?: string,
+        options?: { noteId?: number | null }
+      ) => Promise<{
         success: boolean;
         transcript?: string;
         diarizationSessionId?: string;
