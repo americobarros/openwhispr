@@ -3076,6 +3076,35 @@
       "playSignal": "Play signal"
     }
   },
+  "noscribe": {
+    "title": "Transcribe with noScribe",
+    "description": "Re-transcribe this recording with noScribe — the local transcription and speaker diarization app.",
+    "checking": "Checking for noScribe…",
+    "notInstalled": "noScribe is not installed on this machine. Install it to re-transcribe recordings with speaker diarization.",
+    "notInstalledHint": "noScribe is a free, local transcription app. OpenWhispr finds it automatically; if it's installed in a custom location, point to it with the NO_SCRIBE_PATH environment variable.",
+    "download": "Download noScribe",
+    "language": "Language",
+    "model": "Model",
+    "speakers": "Number of speakers",
+    "speakerAuto": "Auto",
+    "speakerNone": "None",
+    "disfluencies": "Include disfluencies",
+    "disfluenciesHint": "Keep filler words like “uh” and “um”.",
+    "overlapping": "Overlapping speech",
+    "overlappingHint": "Try to identify overlapping speakers in the transcript.",
+    "timestamps": "Timestamps",
+    "timestampsHint": "Include visible time markers in the transcript.",
+    "transcribe": "Transcribe here",
+    "running": "noScribe is transcribing…",
+    "processingAudio": "Converting and processing the audio.",
+    "writingTranscript": "Writing the transcript.",
+    "runningHint": "This runs completely locally and may take several minutes for long meetings. You can keep using OpenWhispr in the meantime.",
+    "savedToHistory": "The transcript was saved to History with a meeting badge.",
+    "errorGeneric": "noScribe transcription failed.",
+    "errorOpen": "Could not open noScribe.",
+    "openApp": "Open in noScribe",
+    "openAppHint": "Open the recording in the noScribe app to tune settings there"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "Enter a folder name.",

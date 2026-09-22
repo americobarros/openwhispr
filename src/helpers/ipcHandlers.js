@@ -97,6 +97,7 @@ const { getTinfoilChatModels } = require("./tinfoilCatalog");
 const { transcribeWithTinfoil } = require("./tinfoilTranscription");
 const { transcribeWithGemini } = require("./geminiTranscription");
 const AudioStorageManager = require("./audioStorage");
+const noScribe = require("./noScribe");
 const LocalModelDownloadStatus = require("./localModelDownloadStatus");
 const AgentStreamRequestRegistry = require("./agentStreamRequestRegistry");
 const createMeetingTranscriptionLifecycle = require("./meetingTranscriptionLifecycle");
@@ -646,6 +647,7 @@ class IPCHandlers {
     this._activeRecordingPipeline = null;
     this._onboardingDemoSession = null;
     this.audioStorageManager = new AudioStorageManager();
+    this._noScribeControllers = new Map(); // requestId -> AbortController
     this.localModelDownloadStatus = new LocalModelDownloadStatus();
     this._retentionCleanupInterval = null;
     this._retentionSettings = { ...DEFAULT_RETENTION_SETTINGS }; // Synced from renderer
@@ -1758,6 +1760,94 @@ class IPCHandlers {
 
     ipcMain.handle("get-audio-storage-usage", async () => {
       return this.audioStorageManager.getStorageUsage();
+    });
+
+    // noScribe integration: re-transcribe a saved recording (meeting notes,
+    // dictations) with the user's installed noScribe app. The recording audio
+    // is resolved by transcription id through the same storage all playback
+    // uses, so no foreign file paths ever reach the renderer.
+    ipcMain.handle("get-noscribe-status", () => {
+      return noScribe.getNoScribeStatus();
+    });
+
+    ipcMain.handle("noscribe-list-models", () => {
+      return noScribe.listNoScribeModels();
+    });
+
+    ipcMain.handle("noscribe-open-file", async (_event, id, options = {}) => {
+      try {
+        const audioPath = this.audioStorageManager.getAudioPath(id);
+        if (!audioPath) {
+          return { success: false, error: "Recording audio not found", code: noScribe.ERROR_CODES.AUDIO_NOT_FOUND };
+        }
+        const executablePath = noScribe.openInNoScribe({
+          audioPath,
+          model: options.model,
+          speakerDetection: options.speakerDetection,
+        });
+        return { success: true, executablePath };
+      } catch (error) {
+        debugLogger.warn("noScribe open-file failed", { error: error.message }, "noscribe");
+        return { success: false, error: error.message, code: error.code };
+      }
+    });
+
+    ipcMain.handle("noscribe-transcribe", async (_event, id, options = {}) => {
+      const requestId = options.requestId;
+      const controller = new AbortController();
+      if (requestId) this._noScribeControllers.set(requestId, controller);
+      try {
+        const audioPath = this.audioStorageManager.getAudioPath(id);
+        if (!audioPath) {
+          return { success: false, error: "Recording audio not found", code: noScribe.ERROR_CODES.AUDIO_NOT_FOUND };
+        }
+        const outputPath = noScribe.createNoScribeOutputPath(id);
+        const { transcript } = await noScribe.transcribeWithNoScribe({
+          audioPath,
+          outputPath,
+          language: options.language,
+          model: options.model,
+          speakerDetection: options.speakerDetection,
+          timestamps: options.timestamps,
+          disfluencies: options.disfluencies,
+          overlapping: options.overlapping,
+          signal: controller.signal,
+          onProgress: (info) => {
+            if (requestId) broadcastToWindows("noscribe-progress", { requestId, ...info });
+          },
+        });
+        noScribe.removeNoScribeOutputFile(outputPath);
+        // Land the result in history so it is discoverable next to the
+        // original meeting recording. A failed save never fails the request —
+        // the transcript is still returned to the dialog.
+        let transcriptionId = null;
+        try {
+          const saved = this.databaseManager.saveTranscription(transcript, null, {
+            routeKind: "meeting",
+          });
+          transcriptionId = saved.id;
+          const updated = this.databaseManager.getTranscriptionById(saved.id);
+          if (updated) broadcastToWindows("transcription-added", updated);
+        } catch (saveError) {
+          debugLogger.warn(
+            "Failed to save noScribe transcript to history",
+            { error: saveError.message },
+            "noscribe"
+          );
+        }
+        return { success: true, transcript, transcriptionId };
+      } catch (error) {
+        debugLogger.warn("noScribe transcription failed", { error: error.message }, "noscribe");
+        return { success: false, error: error.message, code: error.code };
+      } finally {
+        if (requestId) this._noScribeControllers.delete(requestId);
+      }
+    });
+
+    ipcMain.handle("noscribe-transcribe-cancel", async (_event, requestId) => {
+      const controller = requestId ? this._noScribeControllers.get(requestId) : null;
+      if (controller) controller.abort();
+      return { success: Boolean(controller) };
     });
 
     ipcMain.on(

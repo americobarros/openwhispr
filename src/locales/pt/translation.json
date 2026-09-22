@@ -2733,6 +2733,35 @@
       "sentInvites": "Convites enviados"
     }
   },
+  "noscribe": {
+    "title": "Transcrever com noScribe",
+    "description": "Retranscrever esta gravação com o noScribe — o aplicativo local de transcrição e diarização de falantes.",
+    "checking": "Procurando noScribe…",
+    "notInstalled": "O noScribe não está instalado nesta máquina. Instale-o para retranscrever gravações com diarização de falantes.",
+    "notInstalledHint": "O noScribe é um aplicativo gratuito de transcrição local. O OpenWhispr o encontra automaticamente; se for instalado em um local personalizado, aponte para ele com a variável de ambiente NO_SCRIBE_PATH.",
+    "download": "Baixar noScribe",
+    "language": "Idioma",
+    "model": "Modelo",
+    "speakers": "Número de oradores",
+    "speakerAuto": "Automático",
+    "speakerNone": "Nenhum",
+    "disfluencies": "Incluir disfluências",
+    "disfluenciesHint": "Manter palavras de preenchimento como «uh» e «hum».",
+    "overlapping": "Fala sobreposta",
+    "overlappingHint": "Tentar identificar oradores sobrepostos na transcrição.",
+    "timestamps": "Marcadores de tempo",
+    "timestampsHint": "Incluir marcadores de tempo visíveis na transcrição.",
+    "transcribe": "Transcrever aqui",
+    "running": "O noScribe está transcrevendo…",
+    "processingAudio": "Convertendo e processando o áudio.",
+    "writingTranscript": "Escrevendo a transcrição.",
+    "runningHint": "Isso é executado totalmente em modo local e pode levar vários minutos para reuniões longas. Você pode continuar usando o OpenWhispr enquanto isso.",
+    "savedToHistory": "A transcrição foi salva no histórico com um selo de reunião.",
+    "errorGeneric": "A transcrição noScribe falhou.",
+    "errorOpen": "Não foi possível abrir o noScribe.",
+    "openApp": "Abrir no noScribe",
+    "openAppHint": "Abrir a gravação no aplicativo noScribe para ajustar as configurações lá"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "Insira um nome para a pasta.",

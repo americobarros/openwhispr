@@ -3076,6 +3076,35 @@
       "playSignal": "Signal abspielen"
     }
   },
+  "noscribe": {
+    "title": "Mit noScribe transkribieren",
+    "description": "Diese Aufnahme mit noScribe neu transkribieren – der lokalen Transkriptions- und Sprecherdiarisierungs-App.",
+    "checking": "Suche nach noScribe…",
+    "notInstalled": "noScribe ist auf diesem Computer nicht installiert. Installieren Sie es, um Aufnahmen mit Sprecherdiarisierung neu zu transkribieren.",
+    "notInstalledHint": "noScribe ist eine kostenlose lokale Transkriptions-App. OpenWhispr findet sie automatisch; falls sie unter einem benutzerdefinierten Pfad installiert ist, zeigen Sie mit der Umgebungsvariable NO_SCRIBE_PATH darauf.",
+    "download": "noScribe herunterladen",
+    "language": "Sprache",
+    "model": "Modell",
+    "speakers": "Anzahl Sprecher",
+    "speakerAuto": "Automatisch",
+    "speakerNone": "Keine",
+    "disfluencies": "Unflüssigkeiten aufnehmen",
+    "disfluenciesHint": "Füllwörter wie „äh“ und „mhm“ behalten.",
+    "overlapping": "Überlappende Sprache",
+    "overlappingHint": "Überlappende Sprecher im Transkript erkennen.",
+    "timestamps": "Zeitstempel",
+    "timestampsHint": "Sichtbare Zeitmarken im Transkript anzeigen.",
+    "transcribe": "Hier transkribieren",
+    "running": "noScribe transkribiert…",
+    "processingAudio": "Audio wird konvertiert und verarbeitet.",
+    "writingTranscript": "Transkript wird geschrieben.",
+    "runningHint": "Das läuft vollständig lokal und kann bei langen Besprechungen einige Minuten dauern. Sie können OpenWhispr währenddessen weiter nutzen.",
+    "savedToHistory": "Das Transkript wurde mit einem Besprechungs-Abzeichen im Verlauf gespeichert.",
+    "errorGeneric": "noScribe-Transkription fehlgeschlagen.",
+    "errorOpen": "noScribe konnte nicht geöffnet werden.",
+    "openApp": "In noScribe öffnen",
+    "openAppHint": "Aufnahme in der noScribe-App öffnen, um Einstellungen dort anzupassen"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "Gib einen Ordnernamen ein.",

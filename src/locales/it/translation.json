@@ -2733,6 +2733,35 @@
       "sentInvites": "Inviti inviati"
     }
   },
+  "noscribe": {
+    "title": "Trascrivi con noScribe",
+    "description": "Ritrascrivi questa registrazione con noScribe — l'app locale di trascrizione e diarizzazione dei parlanti.",
+    "checking": "Ricerca di noScribe…",
+    "notInstalled": "noScribe non è installato su questo dispositivo. Installalo per ritrascrivere le registrazioni con la diarizzazione dei parlanti.",
+    "notInstalledHint": "noScribe è un'app gratuita di trascrizione locale. OpenWhispr lo trova automaticamente; se è installato in una posizione personalizzata, indicala con la variabile d'ambiente NO_SCRIBE_PATH.",
+    "download": "Scarica noScribe",
+    "language": "Lingua",
+    "model": "Modello",
+    "speakers": "Numero di oratori",
+    "speakerAuto": "Automatico",
+    "speakerNone": "Nessuno",
+    "disfluencies": "Includi le disfluenze",
+    "disfluenciesHint": "Mantieni le parole di riempimento come «uh» e «uhm».",
+    "overlapping": "Discorso sovrapposto",
+    "overlappingHint": "Prova a identificare gli oratori sovrapposti nella trascrizione.",
+    "timestamps": "Timestamp",
+    "timestampsHint": "Includi marcatori temporali visibili nella trascrizione.",
+    "transcribe": "Trascrivi qui",
+    "running": "noScribe sta trascrivendo…",
+    "processingAudio": "Conversione ed elaborazione dell'audio.",
+    "writingTranscript": "Scrittura della trascrizione.",
+    "runningHint": "L'elaborazione avviene interamente in locale e può richiedere diversi minuti per riunioni lunghe. Puoi continuare a usare OpenWhispr nel frattempo.",
+    "savedToHistory": "La trascrizione è stata salvata nella cronologia con un badge di riunione.",
+    "errorGeneric": "Trascrizione noScribe non riuscita.",
+    "errorOpen": "Impossibile aprire noScribe.",
+    "openApp": "Apri in noScribe",
+    "openAppHint": "Apri la registrazione nell'app noScribe per regolare le impostazioni lì"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "Inserisci un nome per la cartella.",

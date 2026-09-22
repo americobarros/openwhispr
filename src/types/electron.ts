@@ -1329,6 +1329,38 @@ declare global {
       deleteTranscriptionAudio: (id: number) => Promise<{ success: boolean }>;
       getAudioStorageUsage: () => Promise<{ fileCount: number; totalBytes: number }>;
       deleteAllAudio: () => Promise<{ deleted: number }>;
+      getNoScribeStatus: () => Promise<{
+        available: boolean;
+        executablePath: string | null;
+        appBundle: string | null;
+      }>;
+      listNoScribeModels: () => Promise<string[]>;
+      openNoScribeFile: (
+        id: number,
+        options?: { model?: string; speakerDetection?: string }
+      ) => Promise<{ success: boolean; error?: string; code?: string; executablePath?: string }>;
+      transcribeWithNoScribe: (
+        id: number,
+        options?: {
+          requestId?: string;
+          language?: string;
+          model?: string;
+          speakerDetection?: string;
+          timestamps?: boolean;
+          disfluencies?: boolean;
+          overlapping?: boolean;
+        }
+      ) => Promise<{
+        success: boolean;
+        transcript?: string;
+        transcriptionId?: number | null;
+        error?: string;
+        code?: string;
+      }>;
+      cancelNoScribeTranscription: (requestId: string) => Promise<{ success: boolean }>;
+      onNoScribeProgress: (
+        callback: (info: { requestId: string; stage: string; bytes?: number }) => void
+      ) => () => void;
       syncRetentionSettings?: (settings: {
         audioRetentionDays: number;
         transcriptRetentionDays: number;

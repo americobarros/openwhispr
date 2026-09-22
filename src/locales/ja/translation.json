@@ -2661,6 +2661,35 @@
       "localServerUnavailable": "このコンピューターでは {{model}} を起動できませんでした。もう一度試すか、クラウドモデルに切り替えてください。"
     }
   },
+  "noscribe": {
+    "title": "noScribe で文字起こし",
+    "description": "この録音を noScribe — ローカルの文字起こし・話者分離アプリ — で文字起こしし直します。",
+    "checking": "noScribe を確認中…",
+    "notInstalled": "このマシンに noScribe がインストールされていません。話者分離付きで録音を文字起こしし直すにはインストールしてください。",
+    "notInstalledHint": "noScribe は無料のローカル文字起こしアプリです。OpenWhispr は自動的に見つけますが、カスタムの場所にインストールしている場合は NO_SCRIBE_PATH 環境変数で指定してください。",
+    "download": "noScribe をダウンロード",
+    "language": "言語",
+    "model": "モデル",
+    "speakers": "話者の人数",
+    "speakerAuto": "自動",
+    "speakerNone": "なし",
+    "disfluencies": "言いよどみを含める",
+    "disfluenciesHint": "「あー」「うーん」などのフィラーを残します。",
+    "overlapping": "重なり発話",
+    "overlappingHint": "文字起こし内で重なり合う話者を識別しようとします。",
+    "timestamps": "タイムスタンプ",
+    "timestampsHint": "文字起こしに表示される時間マーカーを含めます。",
+    "transcribe": "ここで文字起こし",
+    "running": "noScribe が文字起こし中…",
+    "processingAudio": "音声を変換・処理中です。",
+    "writingTranscript": "文字起こしを書き出しています。",
+    "runningHint": "これは完全にローカルで実行され、長い会議では数分かかることがあります。その間も OpenWhispr を引き続き使えます。",
+    "savedToHistory": "文字起こしはミーティングバッジ付きで履歴に保存されました。",
+    "errorGeneric": "noScribe の文字起こしに失敗しました。",
+    "errorOpen": "noScribe を開けませんでした。",
+    "openApp": "noScribe で開く",
+    "openAppHint": "録音を noScribe アプリで開いて、そちらで設定を調整します"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "フォルダ名を入力してください。",

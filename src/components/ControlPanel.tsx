@@ -77,6 +77,8 @@ import {
 import { applyChineseScript, resolveChineseScriptTarget } from "../utils/chineseScript";
 import { getAgentName } from "../utils/agentName";
 import HistoryView from "./HistoryView";
+import NoScribeTranscribeDialog from "./NoScribeTranscribeDialog";
+import type { TranscriptionItem as TranscriptionItemType } from "../types/electron";
 import BackgroundActionToastListener from "./notes/BackgroundActionToastListener";
 import SpaceSyncToastListener from "./notes/SpaceSyncToastListener";
 import { syncService } from "../services/SyncService.js";
@@ -136,6 +138,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
     spaceIds: string[];
   } | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [noScribeDialogItem, setNoScribeDialogItem] = useState<TranscriptionItemType | null>(null);
   const showDiscarded = useShowDiscarded();
   const [activeView, setActiveView] = useState<ControlPanelView>("home");
   const navItems = useControlPanelNavItems();
@@ -1183,6 +1186,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                   clearAllTranscriptions={clearAllTranscriptions}
                   onShowAudioInFolder={showAudioInFolder}
                   onRetryTranscription={retryTranscription}
+                  onNoScribeTranscribe={setNoScribeDialogItem}
                   showDiscarded={showDiscarded}
                   onToggleDiscarded={toggleShowDiscarded}
                   onOpenSettings={(section) => {
@@ -1258,6 +1262,14 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
       </div>
       <BackgroundActionToastListener />
       <SpaceSyncToastListener />
+      <NoScribeTranscribeDialog
+        open={noScribeDialogItem !== null}
+        item={noScribeDialogItem}
+        onOpenChange={(open) => {
+          if (!open) setNoScribeDialogItem(null);
+        }}
+        onCopy={copyToClipboard}
+      />
     </div>
   );
 }

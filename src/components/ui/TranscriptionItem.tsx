@@ -18,6 +18,7 @@ import {
   AlertCircle,
   ArchiveRestore,
   MoreVertical,
+  Sparkles,
 } from "../icons";
 import type {
   TranscriptionItem as TranscriptionItemType,
@@ -53,6 +54,7 @@ interface TranscriptionItemProps {
   onShowAudioInFolder?: (id: number) => void;
   onRetryTranscription?: (id: number, options?: { isRecover?: boolean }) => Promise<void>;
   onOpenSettings?: () => void;
+  onNoScribeTranscribe?: (item: TranscriptionItemType) => void;
 }
 
 export default function TranscriptionItem({
@@ -62,6 +64,7 @@ export default function TranscriptionItem({
   onShowAudioInFolder,
   onRetryTranscription,
   onOpenSettings,
+  onNoScribeTranscribe,
 }: TranscriptionItemProps) {
   const { t, i18n } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -135,6 +138,14 @@ export default function TranscriptionItem({
       label: t(getShowInFolderKey()),
       onSelect: () => onShowAudioInFolder?.(item.id),
     },
+    item.route_kind === "meeting" &&
+      hasAudio &&
+      onNoScribeTranscribe && {
+        key: "noscribe",
+        icon: Sparkles,
+        label: t("noscribe.title"),
+        onSelect: () => onNoScribeTranscribe(item),
+      },
     {
       key: "delete",
       icon: Trash2,

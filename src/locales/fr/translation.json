@@ -3076,6 +3076,35 @@
       "playSignal": "Lire le signal"
     }
   },
+  "noscribe": {
+    "title": "Transcrire avec noScribe",
+    "description": "Re-transcrire cet enregistrement avec noScribe — l'application locale de transcription et de diarisation des locuteurs.",
+    "checking": "Recherche de noScribe…",
+    "notInstalled": "noScribe n'est pas installé sur cette machine. Installez-le pour re-transcrire des enregistrements avec diarisation des locuteurs.",
+    "notInstalledHint": "noScribe est une application gratuite de transcription locale. OpenWhispr le trouve automatiquement ; s'il est installé dans un emplacement personnalisé, indiquez-le avec la variable d'environnement NO_SCRIBE_PATH.",
+    "download": "Télécharger noScribe",
+    "language": "Langue",
+    "model": "Modèle",
+    "speakers": "Nombre de locuteurs",
+    "speakerAuto": "Automatique",
+    "speakerNone": "Aucun",
+    "disfluencies": "Inclure les disfluences",
+    "disfluenciesHint": "Conserver les tics de langage comme « euh » et « hum ».",
+    "overlapping": "Parole superposée",
+    "overlappingHint": "Tenter d'identifier les locuteurs en chevauchement dans la transcription.",
+    "timestamps": "Horodatage",
+    "timestampsHint": "Inclure des repères temporels visibles dans la transcription.",
+    "transcribe": "Transcrire ici",
+    "running": "noScribe transcrit…",
+    "processingAudio": "Conversion et traitement de l'audio.",
+    "writingTranscript": "Écriture de la transcription.",
+    "runningHint": "Ceci s'exécute entièrement en local et peut prendre plusieurs minutes pour les réunions longues. Vous pouvez continuer à utiliser OpenWhispr pendant ce temps.",
+    "savedToHistory": "La transcription a été enregistrée dans l'historique avec un badge de réunion.",
+    "errorGeneric": "La transcription noScribe a échoué.",
+    "errorOpen": "Impossible d'ouvrir noScribe.",
+    "openApp": "Ouvrir dans noScribe",
+    "openAppHint": "Ouvrir l'enregistrement dans l'application noScribe pour y régler les paramètres"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "Saisissez un nom de dossier.",

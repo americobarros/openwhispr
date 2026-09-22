@@ -2733,6 +2733,35 @@
       "sentInvites": "已发出的邀请"
     }
   },
+  "noscribe": {
+    "title": "使用 noScribe 转写",
+    "description": "使用 noScribe——本地转写与说话人分离应用——重新转写此录音。",
+    "checking": "正在检查 noScribe…",
+    "notInstalled": "这台机器上未安装 noScribe。安装后可对录音进行带说话人分离的重新转写。",
+    "notInstalledHint": "noScribe 是一款免费的本地转写应用。OpenWhispr 会自动找到它；如果安装在自定义位置，请通过 NO_SCRIBE_PATH 环境变量指定。",
+    "download": "下载 noScribe",
+    "language": "语言",
+    "model": "模型",
+    "speakers": "说话人数",
+    "speakerAuto": "自动",
+    "speakerNone": "无",
+    "disfluencies": "包含口误词",
+    "disfluenciesHint": "保留「嗯」「呃」等填充词。",
+    "overlapping": "重叠语音",
+    "overlappingHint": "尝试在转写中识别重叠说话的说话人。",
+    "timestamps": "时间戳",
+    "timestampsHint": "在转写中包含可见的时间标记。",
+    "transcribe": "在此转写",
+    "running": "noScribe 正在转写…",
+    "processingAudio": "正在转换和处理音频。",
+    "writingTranscript": "正在写入转写文本。",
+    "runningHint": "此过程完全在本地运行，较长的会议可能需要几分钟。您可以同时继续使用 OpenWhispr。",
+    "savedToHistory": "转写已带会议标记保存至历史记录。",
+    "errorGeneric": "noScribe 转写失败。",
+    "errorOpen": "无法打开 noScribe。",
+    "openApp": "在 noScribe 中打开",
+    "openAppHint": "在 noScribe 应用中打开录音，以便在该处调整设置"
+  },
   "notes": {
     "mutationErrors": {
       "folderNameRequired": "请输入文件夹名称。",

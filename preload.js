@@ -175,6 +175,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("update-transcription-text", id, text, rawText),
   getTranscriptionById: (id) => ipcRenderer.invoke("get-transcription-by-id", id),
 
+  // noScribe integration
+  getNoScribeStatus: () => ipcRenderer.invoke("get-noscribe-status"),
+  listNoScribeModels: () => ipcRenderer.invoke("noscribe-list-models"),
+  openNoScribeFile: (id, options) => ipcRenderer.invoke("noscribe-open-file", id, options),
+  transcribeWithNoScribe: (id, options) =>
+    ipcRenderer.invoke("noscribe-transcribe", id, options),
+  cancelNoScribeTranscription: (requestId) =>
+    ipcRenderer.invoke("noscribe-transcribe-cancel", requestId),
+  onNoScribeProgress: (callback) => {
+    const listener = (_event, info) => callback?.(info);
+    ipcRenderer.on("noscribe-progress", listener);
+    return () => ipcRenderer.removeListener("noscribe-progress", listener);
+  },
+
   // Dictionary functions
   getDictionary: () => ipcRenderer.invoke("db-get-dictionary"),
   setDictionary: (words) => ipcRenderer.invoke("db-set-dictionary", words),
