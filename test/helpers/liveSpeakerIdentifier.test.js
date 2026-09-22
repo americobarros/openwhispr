@@ -206,27 +206,27 @@ test("an unidentified cluster still merges into an identified one", () => {
   assert.equal(merges[0].displayName, "Alice");
 });
 
-test("a voice force-merged at the cap becomes its own speaker once the cap rises", () => {
+test("a distinct voice beyond the soft cap gets its own cluster instead of another person's id", () => {
   const { LiveSpeakerIdentifier } = loadIdentifier();
   const identifier = new LiveSpeakerIdentifier();
   identifier.setMaxSpeakers(1);
 
   const first = identifier._resolveSpeakerForEmbedding(voiceA, { updateCentroid: true });
-  const folded = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
-  assert.equal(folded.speakerId, first.speakerId, "at the cap the voice is folded");
-
-  // Participants added mid-meeting raise the cap; the folded voice must not
-  // stay captured by a centroid polluted during the at-cap period.
-  identifier.setMaxSpeakers(3);
-  const recovered = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
+  const added = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
   assert.notEqual(
-    recovered.speakerId,
+    added.speakerId,
     first.speakerId,
-    "after the cap rises the folded voice must get its own cluster"
+    "the expected-speaker count is a guess; a clearly different voice must not be mislabeled"
   );
+
+  // Raising the cap never pulls a distinct voice into another person's cluster:
+  // it already owns its own.
+  identifier.setMaxSpeakers(3);
+  const again = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
+  assert.equal(again.speakerId, added.speakerId, "the voice keeps its own cluster");
 });
 
-test("an at-cap fold never steals the cluster's identity for a profile-matched voice", () => {
+test("a profile-matched voice beyond the soft cap keeps its own identity", () => {
   const { LiveSpeakerIdentifier } = loadIdentifier();
   const identifier = new LiveSpeakerIdentifier();
   identifier.setMaxSpeakers(1);
@@ -238,16 +238,15 @@ test("an at-cap fold never steals the cluster's identity for a profile-matched v
   const alice = identifier._resolveSpeakerForEmbedding(voiceA, { updateCentroid: true });
   assert.equal(alice.displayName, "Alice");
 
-  // Bob overflows the cap: his utterance is folded into Alice's cluster, but
-  // the cluster must keep Alice's identity — retagging it as Bob would both
-  // mislabel Alice and re-capture Bob through the profile lookup later.
+  // Bob overflows the soft cap: a profile match labels him Bob and gives him
+  // his own cluster — folding him under Alice would mislabel both of them.
   const bobAtCap = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
-  assert.equal(bobAtCap.speakerId, alice.speakerId);
-  assert.equal(bobAtCap.displayName, "Alice");
+  assert.equal(bobAtCap.displayName, "Bob");
+  assert.notEqual(bobAtCap.speakerId, alice.speakerId, "Bob must not be filed under Alice");
 
   identifier.setMaxSpeakers(3);
   const bobAfter = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
-  assert.notEqual(bobAfter.speakerId, alice.speakerId, "Bob must get his own cluster");
+  assert.equal(bobAfter.speakerId, bobAtCap.speakerId, "Bob keeps his own cluster");
   assert.equal(bobAfter.displayName, "Bob");
 
   const aliceAgain = identifier._resolveSpeakerForEmbedding(voiceA, { updateCentroid: true });
@@ -406,18 +405,23 @@ test("identification embeds the exact tail of the concatenated speech chunks", a
   );
 });
 
-test("distinct voices are folded into one cluster when the session cap is 1", () => {
+test("a voice similar enough to an existing cluster folds to respect the cap", () => {
   const { LiveSpeakerIdentifier } = loadIdentifier();
   const identifier = new LiveSpeakerIdentifier();
   identifier.setMaxSpeakers(1);
 
   const first = identifier._resolveSpeakerForEmbedding(voiceA, { updateCentroid: true });
-  const second = identifier._resolveSpeakerForEmbedding(voiceB, { updateCentroid: true });
 
-  assert.equal(cosineSimilarity(voiceA, voiceB), 0);
+  // ambiguousVoice scores 0.7 against A: over the match threshold, so it lands
+  // in A's cluster rather than minting a transient that would fold anyway.
+  const second = identifier._resolveSpeakerForEmbedding(ambiguousVoice, { updateCentroid: true });
+  assert.ok(
+    cosineSimilarity(voiceA, ambiguousVoice) > 0.7,
+    "precondition: ambiguousVoice sounds close to A"
+  );
   assert.equal(
     second.speakerId,
     first.speakerId,
-    "at the cap, new voices are force-merged into the nearest cluster by design"
+    "a closely-sounding voice merges into the existing cluster by design"
   );
 });

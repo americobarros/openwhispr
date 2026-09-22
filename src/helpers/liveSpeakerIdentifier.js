@@ -831,7 +831,7 @@ class LiveSpeakerIdentifier {
       };
     }
 
-const speakerId = this._assignOrForceCluster(embedding);
+      const speakerId = this._assignOrForceCluster(embedding);
     return {
       speakerId,
       displayName: this.transientDisplayNames.get(speakerId) || null,

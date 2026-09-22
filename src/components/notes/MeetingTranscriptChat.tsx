@@ -64,7 +64,7 @@ const getEffectiveSpeakerKey = (
   segment: TranscriptSegment,
   speakerMappings?: Record<string, string>
 ): string => {
-const { name } = resolveSegmentSpeakerName(segment, speakerMappings);
+  const { name } = resolveSegmentSpeakerName(segment, speakerMappings);
   if (name) return `name:${name.toLowerCase()}`;
   if (segment.speaker) return `id:${segment.speaker}`;
   return `src:${segment.source}`;
@@ -978,7 +978,8 @@ export function MeetingTranscriptChat({
         onTouchEnd={handleTouchEnd}
         className="flex-1 min-h-0 overflow-y-auto pt-2 agent-chat-scroll pb-[var(--floating-inset,96px)]"
       >
-<div style={{ height: totalSize, width: "100%", position: "relative" }}>
+        <div className={cn("px-4", contentClassName)}>
+          <div style={{ height: totalSize, width: "100%", position: "relative" }}>
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const i = virtualItem.index;
               const segment = segments[i];

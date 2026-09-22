@@ -49,6 +49,7 @@ function harness({ native = true, local = false } = {}) {
     BrowserWindow: { fromWebContents: () => null },
     debugLogger: { warn() {}, debug() {}, error() {}, info() {} },
     meetingDetectionEngine: { recordMeetingAudioChunk: (_, buffer) => observed.push(buffer) },
+    writeMeetingRetentionAudio: () => {},
     audioTapManager: native ? capture : {},
     meetingAecManager: {
       processSystemBuffer: (buffer) => {
