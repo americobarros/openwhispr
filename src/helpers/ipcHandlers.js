@@ -1776,11 +1776,28 @@ class IPCHandlers {
     // returned so the note's every recording can be re-transcribed.
     const resolveNoScribeNoteAudioTargets = (noteId) => {
       if (noteId == null) return [];
-      const targets = [];
+      const note = this.databaseManager.getNote(noteId);
+
+      // Upload and URL-ingest notes carry their own file path; their audio is
+      // never in the retention store, so no linking or matching applies.
+      if (
+        note &&
+        note.note_type === "upload" &&
+        note.source_file &&
+        fs.existsSync(note.source_file)
+      ) {
+        return [{ path: note.source_file, transcriptionId: null, fileName: note.source_file.split(/[\\/]/).pop() || null }];
+      }
+
+      const byId = new Map();
+      // Recordings linked by name at save time (and any rescued in earlier
+      // resolutions). Each entry is keyed by its own transcription id — never
+      // a bare note id, since note ids share the autoincrement space with
+      // transcription ids.
       for (const source of this.databaseManager.getNoteAudioSources(noteId)) {
         const filePath = this.audioStorageManager.getAudioPath(source.transcription_id);
         if (filePath) {
-          targets.push({
+          byId.set(source.transcription_id, {
             path: filePath,
             transcriptionId: source.transcription_id,
             fileName:
@@ -1790,43 +1807,42 @@ class IPCHandlers {
           });
         }
       }
-      if (targets.length > 0) return targets;
-
-      // Upload and URL-ingest notes carry their own file path.
-      const note = this.databaseManager.getNote(noteId);
-      if (
-        note &&
-        note.note_type === "upload" &&
-        note.source_file &&
-        fs.existsSync(note.source_file)
-      ) {
-        return [{ path: note.source_file, transcriptionId: null, fileName: note.source_file.split(/[\\/]/).pop() || null }];
-      }
-      // Older meetings recorded before the name-based link was written have no
-      // note_audio_sources row. Associate every recording whose exact text
-      // matches a note segment — a note with N recordings has their transcripts
-      // concatenated, so per-segment equality is what succeeds — and persist the
-      // links (with recording names) so the resolver fast-paths on the next call.
-      // Text equality only — timestamps are never a match key.
+      // Meeting / personal notes can hold more recordings than got linked —
+      // an older note, or one whose save-time registration didn't land. Rescue
+      // every unclaimed retention recording whose exact text equals a note
+      // segment (a note with N recordings has their transcripts concatenated,
+      // so per-segment equality is what succeeds), persist the new links, and
+      // union them with the already-linked ones. Text equality only —
+      // timestamps are never a match key.
       if (note && (note.note_type === "meeting" || note.note_type === "personal")) {
         const matched = this.databaseManager.findMeetingRetentionAudioSourcesForNote(note);
         for (const transcriptionId of matched) {
-          this.databaseManager.registerNoteAudioSource(
-            noteId,
-            transcriptionId,
-            this.audioStorageManager.getAudioFileName(transcriptionId)
-          );
+          if (byId.has(transcriptionId)) continue;
+          const fileName =
+            this.audioStorageManager.getAudioFileName(transcriptionId) || null;
+          this.databaseManager.registerNoteAudioSource(noteId, transcriptionId, fileName);
           const filePath = this.audioStorageManager.getAudioPath(transcriptionId);
           if (filePath) {
-            targets.push({
+            byId.set(transcriptionId, {
               path: filePath,
               transcriptionId,
-              fileName:
-                this.audioStorageManager.getAudioFileName(transcriptionId) || null,
+              fileName,
             });
           }
         }
       }
+      const targets = Array.from(byId.values());
+      // Preserve the order the user spoke: linked rows order by link time and
+      // rescued ones by transcription time, which can disagree. Sort by the
+      // transcription's own timestamp so the combined noScribe transcript reads
+      // oldest recording to newest.
+      targets.sort((a, b) => {
+        const aTime =
+          this.databaseManager.getTranscriptionById(a.transcriptionId)?.timestamp || a.path;
+        const bTime =
+          this.databaseManager.getTranscriptionById(b.transcriptionId)?.timestamp || b.path;
+        return String(aTime).localeCompare(String(bTime));
+      });
       return targets;
     };
 
@@ -1918,7 +1934,13 @@ class IPCHandlers {
             overlapping: options.overlapping,
             signal: controller.signal,
             onProgress: (info) => {
-              if (requestId) broadcastToWindows("noscribe-progress", { requestId, ...info });
+              if (requestId)
+                broadcastToWindows("noscribe-progress", {
+                  requestId,
+                  ...info,
+                  recordingIndex: targets.length > 1 ? index + 1 : undefined,
+                  recordingCount: targets.length > 1 ? targets.length : undefined,
+                });
             },
           });
           noScribe.removeNoScribeOutputFile(outputPath);
